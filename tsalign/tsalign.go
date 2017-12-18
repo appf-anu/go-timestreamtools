@@ -160,6 +160,9 @@ func alignedFilename(thisFile string) (string, error) {
 	targetFilename := strings.Replace(thisFile, thisTime.Format(tsForm), aligned.Format(tsForm), 1)
 	// make sure that if its already formatted as a timestream that we reformat the timestream structure.
 	targetFilename = strings.Replace(targetFilename, thisTime.Format(tsDirStruct), aligned.Format(tsDirStruct), 1)
+	if del{
+		return targetFilename, nil
+	}
 
 	return path.Join(outputDir, targetFilename), nil
 }
@@ -200,6 +203,7 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 
 	if _, err := os.Stat(newPath); err == nil {
 		// skip existing.
+		ERRLOG("[skipped] %s", filePath)
 		return nil
 	}
 
@@ -233,9 +237,9 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 var usage = func() {
 	ERRLOG("usage of %s:", os.Args[0])
 	ERRLOG("\talign images in place:")
-	ERRLOG("\t\t -source <source> -output <source>", os.Args[0])
+	ERRLOG("\t\t%s -source <source> -output <source>", os.Args[0])
 	ERRLOG("\t copy aligned to <destination>:")
-	ERRLOG("\t\t %s -source <source> -output=<destination>", os.Args[0])
+	ERRLOG("\t\t%s -source <source> -output=<destination>", os.Args[0])
 
 	ERRLOG("")
 	ERRLOG("flags:")
@@ -243,8 +247,8 @@ var usage = func() {
 	ERRLOG("\t-exif: uses exif data to rename rather than file timestamp")
 	pwd, _ := os.Getwd()
 	ERRLOG("\t-output: set the <destination> directory (default=%s)", pwd)
-	ERRLOG("\t-source: set the <source> directory (optional, default=stdin)", pwd)
-	ERRLOG("\t-interval: set the interval to align to (optional, default=5m)", pwd)
+	ERRLOG("\t-source: set the <source> directory (optional, default=stdin)")
+	ERRLOG("\t-interval: set the interval to align to (optional, default=5m)")
 	ERRLOG("")
 	ERRLOG("reads filepaths from stdin")
 	ERRLOG("will ignore any line from stdin that isnt a filepath (and only a filepath)")

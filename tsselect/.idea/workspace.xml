@@ -1,39 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="aaa31a30-bb26-4526-a8f6-e51359255be7" name="Default" comment="added better build script.&#10;added tsselect: a tool to select time ranges of images.">
-      <change beforePath="" afterPath="$PROJECT_DIR$/../build.sh" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/../tsalign/.idea/modules.xml" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/../tsalign/.idea/tsalign.iml" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/../tsalign/.idea/vcs.xml" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/../tsalign/.idea/workspace.xml" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/../tsarchive/.idea/modules.xml" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/../tsarchive/.idea/tsarchive.iml" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/../tsarchive/.idea/vcs.xml" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/../tsarchive/.idea/workspace.xml" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/../tsrename/.idea/modules.xml" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/../tsrename/.idea/tsrename.iml" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/../tsrename/.idea/vcs.xml" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/../tsrename/.idea/workspace.xml" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/../tsresize/.idea/modules.xml" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/../tsresize/.idea/tsresize.iml" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/../tsresize/.idea/vcs.xml" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/../tsresize/.idea/workspace.xml" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/.idea/modules.xml" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/.idea/tsselect.iml" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/.idea/vcs.xml" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/LICENSE" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/README.md" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/build.sh" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/tsselect" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/tsselect.go" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/tsselect_darwin-amd64" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/tsselect_linux-amd64" />
-      <change beforePath="$PROJECT_DIR$/../tsalign/build.sh" afterPath="$PROJECT_DIR$/../tsalign/build.sh" />
-      <change beforePath="$PROJECT_DIR$/../tsarchive/build.sh" afterPath="$PROJECT_DIR$/../tsarchive/build.sh" />
-      <change beforePath="$PROJECT_DIR$/../tsrename/build.sh" afterPath="$PROJECT_DIR$/../tsrename/build.sh" />
-      <change beforePath="$PROJECT_DIR$/../tsresize/build.sh" afterPath="$PROJECT_DIR$/../tsresize/build.sh" />
+    <list default="true" id="aaa31a30-bb26-4526-a8f6-e51359255be7" name="Default" comment="">
+      <change beforePath="" afterPath="$PROJECT_DIR$/../tscrop/.idea/vcs.xml" />
+      <change beforePath="$PROJECT_DIR$/../tsalign/.idea/workspace.xml" afterPath="$PROJECT_DIR$/../tsalign/.idea/workspace.xml" />
+      <change beforePath="$PROJECT_DIR$/../tsarchive/.idea/workspace.xml" afterPath="$PROJECT_DIR$/../tsarchive/.idea/workspace.xml" />
+      <change beforePath="$PROJECT_DIR$/../tsresize/.idea/workspace.xml" afterPath="$PROJECT_DIR$/../tsresize/.idea/workspace.xml" />
+      <change beforePath="$PROJECT_DIR$/../tsresize/tsresize" afterPath="$PROJECT_DIR$/../tsresize/tsresize" />
+      <change beforePath="$PROJECT_DIR$/../tsresize/tsresize.go" afterPath="$PROJECT_DIR$/../tsresize/tsresize.go" />
+      <change beforePath="$PROJECT_DIR$/../tsresize/tsresize_darwin-amd64" afterPath="$PROJECT_DIR$/../tsresize/tsresize_darwin-amd64" />
+      <change beforePath="$PROJECT_DIR$/../tsresize/tsresize_linux-amd64" afterPath="$PROJECT_DIR$/../tsresize/tsresize_linux-amd64" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
+      <change beforePath="$PROJECT_DIR$/tsselect.go" afterPath="$PROJECT_DIR$/tsselect.go" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -47,21 +25,11 @@
       <file leaf-file-name="tsselect.go" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/tsselect.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="378">
-              <caret line="21" column="35" lean-forward="true" selection-start-line="21" selection-start-column="35" selection-end-line="21" selection-end-column="35" />
+            <state relative-caret-position="158">
+              <caret line="150" column="45" lean-forward="false" selection-start-line="150" selection-start-column="45" selection-end-line="150" selection-end-column="45" />
               <folding>
                 <element signature="e#14#210#0" expanded="true" />
               </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="fuzzy.go" pinned="false" current-in-tab="false">
-        <entry file="file://$USER_HOME$/go/src/github.com/bcampbell/fuzzytime/fuzzy.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="774">
-              <caret line="78" column="5" lean-forward="false" selection-start-line="78" selection-start-column="5" selection-end-line="78" selection-end-column="5" />
-              <folding />
             </state>
           </provider>
         </entry>
@@ -109,10 +77,10 @@
     <sorting>DEFINITION_ORDER</sorting>
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="2563" />
-    <option name="y" value="-13" />
+    <option name="x" value="3643" />
+    <option name="y" value="462" />
     <option name="width" value="1074" />
-    <option name="height" value="1907" />
+    <option name="height" value="484" />
   </component>
   <component name="ProjectLevelVcsManager" settingsEditedManually="true">
     <ConfirmationsSetting value="1" id="Add" />
@@ -133,6 +101,7 @@
     </navigator>
     <panes>
       <pane id="Scratches" />
+      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -144,7 +113,6 @@
           <select />
         </subPane>
       </pane>
-      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -169,27 +137,27 @@
     <option name="remove_strategy" value="false" />
   </component>
   <component name="ToolWindowManager">
-    <frame x="2563" y="-13" width="1074" height="1907" extended-state="0" />
+    <frame x="3643" y="462" width="1074" height="484" extended-state="0" />
     <editor active="true" />
     <layout>
-      <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
-      <window_info id="Messages" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.328911" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.329849" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
-      <window_info id="REST Client" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32946378" sideWeight="0.5" order="-1" side_tool="false" content_ui="tabs" />
-      <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32930514" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32946378" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
-      <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.20654206" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
+      <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
+      <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.329849" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
       <window_info id="Database" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
-      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
+      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32946378" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32930514" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
-      <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
+      <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
+      <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
       <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
+      <window_info id="Messages" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.328911" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Inspection" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
+      <window_info id="REST Client" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32946378" sideWeight="0.5" order="8" side_tool="false" content_ui="tabs" />
       <window_info id="Hierarchy" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="2" side_tool="false" content_ui="combo" />
+      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
     </layout>
   </component>
@@ -235,7 +203,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="68">
           <caret line="4" column="0" lean-forward="false" selection-start-line="4" selection-start-column="0" selection-end-line="4" selection-end-column="0" />
-          <folding />
         </state>
       </provider>
     </entry>
@@ -254,7 +221,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="68">
           <caret line="4" column="0" lean-forward="false" selection-start-line="4" selection-start-column="0" selection-end-line="4" selection-end-column="0" />
-          <folding />
         </state>
       </provider>
     </entry>
@@ -305,7 +271,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="198">
           <caret line="11" column="0" lean-forward="true" selection-start-line="11" selection-start-column="0" selection-end-line="11" selection-end-column="0" />
-          <folding />
         </state>
       </provider>
     </entry>
@@ -464,8 +429,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/tsselect.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="378">
-          <caret line="21" column="35" lean-forward="true" selection-start-line="21" selection-start-column="35" selection-end-line="21" selection-end-column="35" />
+        <state relative-caret-position="158">
+          <caret line="150" column="45" lean-forward="false" selection-start-line="150" selection-start-column="45" selection-end-line="150" selection-end-column="45" />
           <folding>
             <element signature="e#14#210#0" expanded="true" />
           </folding>

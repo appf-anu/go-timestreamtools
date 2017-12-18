@@ -156,6 +156,7 @@ var usage = func() {
 	ERRLOG("\t-exif: uses exif data to get time instead of the file timestamp")
 	ERRLOG("\t-source: set the <source> directory (optional, default=stdin)")
 	ERRLOG("")
+	ERRLOG("writes paths to resulting files to stdout")
 	ERRLOG("reads filepaths from stdin")
 	ERRLOG("will ignore any line from stdin that isnt a filepath (and only a filepath)")
 	ERRLOG("dates are assumed to be DMY or YMD not MDY")

@@ -15,15 +15,15 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"bufio"
+	"errors"
 )
 
 var (
-	rootDir          string
-	outputDir        string
-	targetResolution string
-	targetExtension  string
-	resolutionPair   []int
-	imageEncoder     imgio.Encoder
+	rootDir, outputDir, targetExtension string
+	resolution                                            image.Point
+	stdin                                                 bool
+	imageEncoder                                          imgio.Encoder
 )
 
 func ERRLOG(format string, a ...interface{}) (n int, err error) {
@@ -61,29 +61,36 @@ func getExifData(thisFile string) ([]byte, error) {
 	return jsonBytes, nil
 }
 
-func convertImage(sourcePath, destPath string) error {
-	exifJson, err := getExifData(sourcePath)
 
-	if err != nil {
+func writeExifJson(sourcePath, destPath string){
+	exifJson, exifJSONErr := getExifData(sourcePath)
+
+	if exifJSONErr != nil {
 		ERRLOG("[exif] couldnt read data from %s", sourcePath)
 	}
 	if len(exifJson) > 0 {
-		err := ioutil.WriteFile(destPath+".json", exifJson, 0644)
-		if err != nil {
+		exifJSONErr := ioutil.WriteFile(destPath+".json", exifJson, 0644)
+		if exifJSONErr != nil {
 			ERRLOG("[exif] couldnt write json %s", destPath)
 		}
 	}
+}
+
+func convertImage(sourcePath, destPath string) (err error) {
+	writeExifJson(sourcePath, destPath)
 
 	img, err := imgio.Open(sourcePath)
 	if err != nil {
-		return err
+		return
 	}
-	resized := transform.Resize(img, resolutionPair[0], resolutionPair[1], transform.Lanczos)
+	if img == nil{
+		return errors.New("[imgload] Nil img wtf")
+	}
 
-	if err := imgio.Save(destPath, resized, imageEncoder); err != nil {
-		return err
-	}
-	return nil
+	resized := transform.Resize(img, resolution.X, resolution.Y, transform.Lanczos)
+
+	imgio.Save(destPath, resized, imageEncoder)
+	return
 }
 
 func visit(filePath string, info os.FileInfo, _ error) error {
@@ -120,38 +127,46 @@ var usage = func() {
 	ERRLOG("usage of %s:\n", os.Args[0])
 
 	pwd, _ := os.Getwd()
-	ERRLOG("\t-type: set the output image type (default=jpeg)\n")
-	ERRLOG("\t\tavailable image types:\n")
-	ERRLOG("\t\tjpeg, png\n")
-	ERRLOG("\t\ttiff: tiff with Deflate compression (alias for tiff-deflate)\n")
-	ERRLOG("\t\ttiff-lzw: tiff with LZW compression\n")
-	ERRLOG("\t\ttiff-none: tiff with no compression\n")
-	ERRLOG("\t-output: set the <destination> directory (default=%s)\n", pwd)
+	ERRLOG("")
+	ERRLOG("flags:")
+	ERRLOG("\t-res: output image resolution")
+	ERRLOG("\t-output: <destination> directory (default=<res>/%s)", pwd)
+	ERRLOG("\t-type: output image type (default=jpeg)")
+	ERRLOG("")
+	ERRLOG("\t\tavailable image types:")
+	ERRLOG("\t\tjpeg, png")
+	ERRLOG("\t\ttiff: tiff with Deflate compression (alias for tiff-deflate)")
+	ERRLOG("\t\ttiff-lzw: tiff with LZW compression")
+	ERRLOG("\t\ttiff-none: tiff with no compression")
+
+	ERRLOG("")
+	ERRLOG("writes paths to resulting files to stdout")
+	ERRLOG("reads filepaths from stdin")
+	ERRLOG("will ignore any line from stdin that isnt a filepath (and only a filepath)")
+}
+
+func stringToPoint(str, sep string) (image.Point, error) {
+	var err error
+	ra := strings.Split(str, sep)
+	point := image.Point{}
+	if point.X, err = strconv.Atoi(ra[0]); err !=nil{
+		return image.Point{}, err
+	}
+	if point.Y, err = strconv.Atoi(ra[1]); err !=nil{
+		return image.Point{}, err
+	}
+
+	return point, err
 }
 
 func init() {
-	flagset := flag.NewFlagSet("", flag.ExitOnError)
-
-	flagset.Usage = usage
 	flag.Usage = usage
-	// set flags for flagset
-	flagset.StringVar(&outputDir, "output", "", "output directory")
-	outputType := flagset.String("type", "jpeg", "output image type")
-
-	flagset.StringVar(&targetResolution, "res", "1920x1080", "target resolution")
-
-	// parse the leading argument with normal flag.Parse
+	// set flags for flag
+	flag.StringVar(&rootDir, "source", "", "source directory")
+	flag.StringVar(&outputDir, "output", "", "output directory")
+	outputType := flag.String("type", "jpeg", "output image type")
+	res := flag.String("res", "", "resolution")
 	flag.Parse()
-	if flag.NArg() < 1 {
-		ERRLOG("[path] no <source> specified")
-		usage()
-		os.Exit(1)
-	}
-
-	// parse flags using a flagset, ignore the first 2 (first arg is program name)
-	flagset.Parse(os.Args[2:])
-
-	rootDir = flag.Arg(0)
 
 	switch *outputType {
 	case "jpeg":
@@ -176,33 +191,55 @@ func init() {
 		imageEncoder = imgio.JPEGEncoder(95)
 		targetExtension = "jpeg"
 	}
+	if *res == ""{
+		ERRLOG("[flag] no resolution specified")
+		os.Exit(2)
+	}
+
+	var err error
+	resolution, err = stringToPoint(*res,"x")
+	if err != nil{
+		ERRLOG("[flag] %s", err)
+		panic(err)
+	}
+	if rootDir != "" {
+		if _, err := os.Stat(rootDir); err != nil {
+			if os.IsNotExist(err) {
+				ERRLOG("[path] <source> %s does not exist", rootDir)
+				os.Exit(1)
+			}
+		}
+	}
+	if outputDir == ""{
+		outputDir = path.Join(".", *res)
+	}
+	os.MkdirAll(outputDir, 0755)
+	stdin = rootDir == ""
+
 }
 
 func main() {
-	if _, err := os.Stat(rootDir); err != nil {
-		if os.IsNotExist(err) {
-			ERRLOG("[path] <source> %s does not exist.", rootDir)
-			os.Exit(1)
+	if !stdin{
+		if err := filepath.Walk(rootDir, visit); err != nil {
+			ERRLOG("[walk] %s", err)
 		}
+		return
 	}
-
-	if outputDir == "" {
-		outputDir = path.Join(rootDir, targetResolution)
-		ERRLOG("[path] no <destination>, creating %s", outputDir)
-	}
-	os.MkdirAll(outputDir, 0755)
-
-	ra := strings.Split(targetResolution, "x")
-	for _, i := range ra[:2] {
-		j, err := strconv.Atoi(i)
-		if err != nil {
-			panic(err)
+	// start scanner and wait for stdin
+	scanner := bufio.NewScanner(os.Stdin)
+	for scanner.Scan() {
+		text := strings.Replace(scanner.Text(), "\n", "", -1)
+		if strings.HasPrefix(text, "[") {
+			ERRLOG("[stdin] %s", text)
+			continue
+		} else {
+			finfo, err := os.Stat(text)
+			if err != nil {
+				ERRLOG("[stat] %s", err)
+				continue
+			}
+			visit(text, finfo, nil)
 		}
-		resolutionPair = append(resolutionPair, j)
-	}
-
-	if err := filepath.Walk(rootDir, visit); err != nil {
-		ERRLOG("[walk] %s", err)
 	}
 	//c := make(chan error)
 	//go func() {

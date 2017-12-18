@@ -11,6 +11,6 @@
             a := io.NewSectionReader(d.r, offset, n)
             img, err = jpeg.Decode(a)
             if err == nil{
-                return nil, err
+                return img, err
             }
             return
