@@ -1,6 +1,7 @@
 #!/bin/bash
+result=${PWD##*/}
 export GOARCH=amd64
-fn="${1:-tsrename}"
+fn="${1:-$result}"
 filename=$(basename "$fn")
 extension="${filename##*.}"
 filename="${filename%.*}"
