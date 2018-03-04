@@ -236,7 +236,7 @@ var usage = func() {
 	ERRLOG("\t-exif: uses exif data to rename rather than file timestamp")
 	pwd, _ := os.Getwd()
 	ERRLOG("\t-output: set the <destination> directory (default=%s)", pwd)
-	ERRLOG("\t-source: set the <source> directory (optional, default=stdin)", pwd)
+	ERRLOG("\t-source: set the <source> directory (optional, default=stdin)")
 	ERRLOG("")
 	ERRLOG("reads filepaths from stdin")
 	ERRLOG("will ignore any line from stdin that isnt a filepath (and only a filepath)")
