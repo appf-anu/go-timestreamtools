@@ -25,9 +25,9 @@ const (
 )
 
 var (
-	rootDir, outputDir, namedOutput string
-	del                             bool
-	datetimeFunc                    datetimeFunction
+	rootDir, outputDir string
+	del                bool
+	datetimeFunc       datetimeFunction
 )
 
 var /* const */ tsRegex = regexp.MustCompile(tsRegexPattern)
@@ -150,10 +150,8 @@ func parseFilename(thisFile string) (string, error) {
 		return "", err
 	}
 
-	formattedSubdirs := path.Dir(thisFile)
-
-	ext := path.Ext(thisFile)
-	targetFilename := namedOutput + "_" + thisTime.Format(tsForm) + ext
+	formattedSubdirs := thisTime.Format(tsDirStruct)
+	targetFilename := path.Base(thisFile)
 
 	newT := path.Join(outputDir, formattedSubdirs, targetFilename)
 
@@ -223,16 +221,16 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 
 var usage = func() {
 	ERRLOG("usage of %s:", os.Args[0])
-	ERRLOG("\tcopy with <name> prefix:")
-	ERRLOG("\t\t %s -source <source> -name=<name>", os.Args[0])
-
-	ERRLOG("\tcopy with <name> prefix:")
-	ERRLOG("\t\t %s -source <source> -name=<name>", os.Args[0])
+	ERRLOG("\tcopy into structure:")
+	ERRLOG("\t\t %s -source <source>", os.Args[0])
+	ERRLOG("\tcopy into structure at <destination>:")
+	ERRLOG("\t\t %s -source <source> -output=<destination>", os.Args[0])
+	ERRLOG("\trename (move) into structure:")
+	ERRLOG("\t\t %s -source <source> -del", os.Args[0])
 
 	ERRLOG("")
 	ERRLOG("flags:")
 	ERRLOG("\t-del: removes the source files")
-	ERRLOG("\t-name: renames the prefix fo the target files")
 	ERRLOG("\t-exif: uses exif data to rename rather than file timestamp")
 	pwd, _ := os.Getwd()
 	ERRLOG("\t-output: set the <destination> directory (default=%s)", pwd)
@@ -246,7 +244,6 @@ var usage = func() {
 func init() {
 	flag.Usage = usage
 	// set flags for flagset
-	flag.StringVar(&namedOutput, "name", "", "name for the stream")
 	flag.StringVar(&rootDir, "source", "", "source directory")
 	flag.StringVar(&outputDir, "output", ".", "output directory")
 	flag.BoolVar(&del, "del", false, "delete source files")
