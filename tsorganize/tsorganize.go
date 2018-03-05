@@ -20,12 +20,13 @@ import (
 const (
 	tsForm         = "2006_01_02_15_04_05"
 	dumbExifForm   = "2006:01:02 15:04:05"
-	tsDirStruct    = "2006/2006_01/2006_01_02/2006_01_02_15/"
 	tsRegexPattern = "[0-9][0-9][0-9][0-9]_[0-1][0-9]_[0-3][0-9]_[0-2][0-9]_[0-5][0-9]_[0-5][0-9]"
 )
 
+
+
 var (
-	rootDir, outputDir string
+	rootDir, outputDir, tsDirStruct string
 	del                bool
 	datetimeFunc       datetimeFunction
 )
@@ -231,10 +232,11 @@ var usage = func() {
 	ERRLOG("")
 	ERRLOG("flags:")
 	ERRLOG("\t-del: removes the source files")
+	ERRLOG("\t-dirstruct: directory structure to pass to golangs time.Format")
 	ERRLOG("\t-exif: uses exif data to rename rather than file timestamp")
 	pwd, _ := os.Getwd()
 	ERRLOG("\t-output: set the <destination> directory (default=%s)", pwd)
-	ERRLOG("\t-source: set the <source> directory (optional, default=stdin)", pwd)
+	ERRLOG("\t-source: set the <source> directory (optional, default=stdin)")
 	ERRLOG("")
 	ERRLOG("reads filepaths from stdin")
 	ERRLOG("will ignore any line from stdin that isnt a filepath (and only a filepath)")
@@ -246,6 +248,7 @@ func init() {
 	// set flags for flagset
 	flag.StringVar(&rootDir, "source", "", "source directory")
 	flag.StringVar(&outputDir, "output", ".", "output directory")
+	flag.StringVar(&tsDirStruct, "dirstruct", "2006/2006_01/2006_01_02/2006_01_02_15/", "output directory structure")
 	flag.BoolVar(&del, "del", false, "delete source files")
 
 	useExif := flag.Bool("exif", false, "use exif instead of timestamps in filenames")

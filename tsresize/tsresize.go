@@ -76,6 +76,7 @@ func writeExifJson(sourcePath, destPath string){
 	}
 }
 
+
 func convertImage(sourcePath, destPath string) (err error) {
 	writeExifJson(sourcePath, destPath)
 
