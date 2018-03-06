@@ -11,6 +11,10 @@ notifications:
 
 before_script:
   - go get github.com/rwcarlsen/goexif/exif
+  - go get github.com/anthonynsimon/bild/imgio
+  - go get github.com/anthonynsimon/bild/transform
+  - go get golang.org/x/image/tiff
+  - go get github.com/bcampbell/fuzzytime
 
 script:
   - ./build.sh ./tsalign
