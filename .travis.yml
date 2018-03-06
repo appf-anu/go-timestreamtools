@@ -1,0 +1,51 @@
+language: go
+
+go:
+  - "1.10"
+
+install: true
+
+#dont email me i dont like spam
+notifications:
+  email: false
+
+before_script:
+  - go get github.com/rwcarlsen/goexif/exif
+  - go get github.com/anthonynsimon/bild/imgio
+  - go get github.com/anthonynsimon/bild/transform
+  - go get golang.org/x/image/tiff
+  - go get github.com/bcampbell/fuzzytime
+  - go get github.com/oliamb/cutter
+
+
+script:
+  - ./build.sh ./tsalign
+  - ./build.sh ./tsarchive
+  - ./build.sh ./tscrop
+  - ./build.sh ./tsorganize
+  - ./build.sh ./tsrename
+  - ./build.sh ./tsresize
+  - ./build.sh ./tsselect
+
+
+deploy:
+  - provider: releases
+    api_key: $TOKEN
+    file_glob: true
+    file: "*_win*"
+    name: Build $(date +'%d.%m.%Y %R') - WIN
+    skip_cleanup: true
+
+  - provider: releases
+    api_key: $TOKEN
+    file_glob: true
+    file: "*_linux*"
+    name: Build $(date +'%d.%m.%Y %R') - LINUX
+    skip_cleanup: true
+
+  - provider: releases
+    api_key: $TOKEN
+    file_glob: true
+    file: "*_darwin*"
+    name: Build $(date +'%d.%m.%Y %R') - DARWIN
+    skip_cleanup: true
