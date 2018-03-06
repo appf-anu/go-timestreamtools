@@ -21,10 +21,10 @@ before_script:
 script:
   - ./build.sh ./tsalign
   - ./build.sh ./tsarchive
-  - ./build.sh ./tscrop
+#  - ./build.sh ./tscrop
   - ./build.sh ./tsorganize
   - ./build.sh ./tsrename
-  - ./build.sh ./tsresize
+#  - ./build.sh ./tsresize
   - ./build.sh ./tsselect
 
 
