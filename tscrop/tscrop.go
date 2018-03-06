@@ -192,7 +192,6 @@ var usage = func() {
 	ERRLOG("\t\tavailable image types:")
 	ERRLOG("\t\tjpeg, png")
 	ERRLOG("\t\ttiff: tiff with Deflate compression (alias for tiff-deflate)")
-	ERRLOG("\t\ttiff-lzw: tiff with LZW compression")
 	ERRLOG("\t\ttiff-none: tiff with no compression")
 	ERRLOG("\t-output: set the <destination> directory (default=%s/<crop>)", pwd)
 	ERRLOG("")
@@ -239,9 +238,6 @@ func init() {
 		targetExtension = "jpeg"
 	case "tiff":
 		imageEncoder = TIFFEncoder(tiff.Deflate)
-		targetExtension = "tif"
-	case "tiff-lzw":
-		imageEncoder = TIFFEncoder(tiff.LZW)
 		targetExtension = "tif"
 	case "tiff-deflate":
 		imageEncoder = TIFFEncoder(tiff.Deflate)
