@@ -13,13 +13,13 @@ before_script:
   - go get github.com/rwcarlsen/goexif/exif
 
 script:
-  - ./build.sh tsalign
-  - ./build.sh tsarchive
-  - ./build.sh tscrop
-  - ./build.sh tsorganize
-  - ./build.sh tsrename
-  - ./build.sh tsresize
-  - ./build.sh tsselect
+  - ./build.sh ./tsalign
+  - ./build.sh ./tsarchive
+  - ./build.sh ./tscrop
+  - ./build.sh ./tsorganize
+  - ./build.sh ./tsrename
+  - ./build.sh ./tsresize
+  - ./build.sh ./tsselect
 
 
 deploy:
