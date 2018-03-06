@@ -12,7 +12,16 @@ notifications:
 #before_script:
 #  - go get
 
-script: ./build.sh
+script: 
+  - ./build.sh tsalign
+  - ./build.sh tsarchive
+  - ./build.sh tscrop
+  - ./build.sh tsorganize
+  - ./build.sh tsrename
+  - ./build.sh tsresize
+  - ./build.sh tsselect 
+
+  
 deploy:
   - provider: releases
     api_key: $TOKEN
