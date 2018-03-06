@@ -10,13 +10,12 @@ notifications:
   email: false
 
 before_script:
-  - go get ./...
-#  - go get github.com/rwcarlsen/goexif/exif
-#  - go get github.com/anthonynsimon/bild/imgio
-#  - go get github.com/anthonynsimon/bild/transform
-#  - go get golang.org/x/image/tiff
-#  - go get github.com/bcampbell/fuzzytime
-#  - go get github.com/oliamb/cutter
+  - go get github.com/rwcarlsen/goexif/exif
+  - go get github.com/anthonynsimon/bild/imgio
+  - go get github.com/anthonynsimon/bild/transform
+  - go get golang.org/x/image/tiff
+  - go get github.com/bcampbell/fuzzytime
+  - go get github.com/oliamb/cutter
 
 
 script:
@@ -47,4 +46,3 @@ deploy:
     file: "*_darwin*"
     name: Build $(date +'%d.%m.%Y %R') - DARWIN
     skip_cleanup: true
-  
