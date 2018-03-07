@@ -36,9 +36,9 @@ script:
   - ./build.sh ./tsselect
 
 before_deploy:
-  - tar -zcvf windows.tar.gz *_win*
-  - tar -zcvf darwind.tar.gz *_darwin*
-  - tar -zcvf linux.tar.gz *_linux*
+  - tar -zcvf windows.tar.gz **/*_win*
+  - tar -zcvf darwin.tar.gz **/*_darwin*
+  - tar -zcvf linux.tar.gz **/*_linux*
 
 deploy:
   provider: releases
