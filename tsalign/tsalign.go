@@ -36,7 +36,7 @@ var /* const */ tsRegex = regexp.MustCompile(tsRegexPattern)
 
 var errLog *log.Logger
 
-func outputPath(a ...interface{}) (n int, err error) {
+func emitPath(a ...interface{}) (n int, err error) {
 	return fmt.Fprintln(os.Stdout, a...)
 }
 
@@ -229,7 +229,7 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 			errLog.Println("[exif] couldn't move json exif file")
 		}
 	}
-	outputPath(newPath)
+	emitPath(newPath)
 	return err
 }
 

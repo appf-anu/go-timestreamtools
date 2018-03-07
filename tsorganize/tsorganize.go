@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+  "log"
 )
 
 const (
@@ -22,8 +23,6 @@ const (
 	dumbExifForm   = "2006:01:02 15:04:05"
 	tsRegexPattern = "[0-9][0-9][0-9][0-9]_[0-1][0-9]_[0-3][0-9]_[0-2][0-9]_[0-5][0-9]_[0-5][0-9]"
 )
-
-
 
 var (
 	rootDir, outputDir, tsDirStruct string
@@ -33,11 +32,9 @@ var (
 
 var /* const */ tsRegex = regexp.MustCompile(tsRegexPattern)
 
-func ERRLOG(format string, a ...interface{}) (n int, err error) {
-	return fmt.Fprintf(os.Stderr, format+"\n", a...)
-}
+var errLog *log.Logger
 
-func OUTPUT(a ...interface{}) (n int, err error) {
+func emitPath(a ...interface{}) (n int, err error) {
 	return fmt.Fprintln(os.Stdout, a...)
 }
 
@@ -93,10 +90,10 @@ func getTimeFromExif(thisFile string) (datetime time.Time, err error) {
 
 		byt, err := ioutil.ReadFile(thisFile + ".json")
 		if err != nil {
-			ERRLOG("[json] cant read file %s", err)
+			errLog.Printf("[json] cant read file %s", err)
 		}
 		if err := json.Unmarshal(byt, &eData); err != nil {
-			ERRLOG("[json] can't unmarshal %s", err)
+			errLog.Printf("[json] can't unmarshal %s", err)
 		}
 
 		datetimeString = eData.DateTime
@@ -111,7 +108,7 @@ func getTimeFromExif(thisFile string) (datetime time.Time, err error) {
 		exifData, err := exif.Decode(fileHandler)
 		if err != nil {
 			// exif wouldnt decode
-			return time.Time{}, errors.New(fmt.Sprintf("[exif] couldn't decode exif from image %s", err))
+			return time.Time{}, fmt.Errorf("[exif] couldn't decode exif from image %s", err)
 		}
 		dt, err := exifData.Get(exif.DateTime) // normally, don't ignore errors!
 		if err != nil {
@@ -125,7 +122,7 @@ func getTimeFromExif(thisFile string) (datetime time.Time, err error) {
 		}
 	}
 	if datetime, err = parseExifDatetime(datetimeString); err != nil {
-		ERRLOG("[parse] parse datetime %s", err)
+		errLog.Printf("[parse] parse datetime %s", err)
 	}
 	return
 }
@@ -171,7 +168,7 @@ func moveOrRename(source, dest string) error {
 		err = moveFilebyCopy(source, dest)
 	}
 	if err != nil {
-		ERRLOG("[move] %s", err)
+		errLog.Printf("[move] %s", err)
 		return nil
 	}
 	return err
@@ -189,21 +186,21 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 	// parse the new filepath
 	newPath, err := parseFilename(filePath)
 	if err != nil {
-		ERRLOG("[parse] %s", err)
+		errLog.Printf("[parse] %s", err)
 		return nil
 	}
 
 	// make directories
 	err = os.MkdirAll(path.Dir(newPath), 0755)
 	if err != nil {
-		ERRLOG("[mkdir] %s", err)
+		errLog.Printf("[mkdir] %s", err)
 		return nil
 	}
 
 	absSrc, _ := filepath.Abs(filePath)
 	absDest, _ := filepath.Abs(newPath)
 	if absSrc == absDest {
-		ERRLOG("[dupe] %s", absDest)
+		errLog.Printf("[dupe] %s", absDest)
 		return nil
 	}
 
@@ -211,39 +208,40 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 	jsFile := filePath + ".json"
 	if _, ferr := os.Stat(jsFile); ferr == nil {
 		if e := moveOrRename(jsFile, absDest+".json"); e != nil {
-			ERRLOG("[exif] couldn't move json exif file")
+			errLog.Printf("[exif] couldn't move json exif file")
 		}
 	}
 
-	OUTPUT(newPath)
+	emitPath(newPath)
 
 	return err
 }
 
 var usage = func() {
-	ERRLOG("usage of %s:", os.Args[0])
-	ERRLOG("\tcopy into structure:")
-	ERRLOG("\t\t %s -source <source>", os.Args[0])
-	ERRLOG("\tcopy into structure at <destination>:")
-	ERRLOG("\t\t %s -source <source> -output=<destination>", os.Args[0])
-	ERRLOG("\trename (move) into structure:")
-	ERRLOG("\t\t %s -source <source> -del", os.Args[0])
+	fmt.Printf("usage of %s:\n", os.Args[0])
+	fmt.Println("\tcopy into structure:")
+	fmt.Printf("\t\t %s -source <source>\n", os.Args[0])
+	fmt.Println("\tcopy into structure at <destination>:")
+	fmt.Printf("\t\t %s -source <source> -output=<destination>\n", os.Args[0])
+	fmt.Println("\trename (move) into structure:")
+	fmt.Printf("\t\t %s -source <source> -del\n", os.Args[0])
 
-	ERRLOG("")
-	ERRLOG("flags:")
-	ERRLOG("\t-del: removes the source files")
-	ERRLOG("\t-dirstruct: directory structure to pass to golangs time.Format")
-	ERRLOG("\t-exif: uses exif data to rename rather than file timestamp")
+	fmt.Println("")
+	fmt.Println("flags:")
+	fmt.Println("\t-del: removes the source files")
+	fmt.Println("\t-dirstruct: directory structure to pass to golangs time.Format")
+	fmt.Println("\t-exif: uses exif data to rename rather than file timestamp")
 	pwd, _ := os.Getwd()
-	ERRLOG("\t-output: set the <destination> directory (default=%s)", pwd)
-	ERRLOG("\t-source: set the <source> directory (optional, default=stdin)")
-	ERRLOG("")
-	ERRLOG("reads filepaths from stdin")
-	ERRLOG("will ignore any line from stdin that isnt a filepath (and only a filepath)")
+	fmt.Printf("\t-output: set the <destination> directory (default=%s)\n", pwd)
+	fmt.Println("\t-source: set the <source> directory (optional, default=stdin)")
+	fmt.Println("")
+	fmt.Println("reads filepaths from stdin")
+	fmt.Println("will ignore any line from stdin that isnt a filepath (and only a filepath)")
 
 }
 
 func init() {
+  errLog = log.New(os.Stderr, "[ERR] ", log.Ldate|log.Ltime|log.Lshortfile)
 	flag.Usage = usage
 	// set flags for flagset
 	flag.StringVar(&rootDir, "source", "", "source directory")
@@ -264,7 +262,7 @@ func init() {
 	if rootDir != "" {
 		if _, err := os.Stat(rootDir); err != nil {
 			if os.IsNotExist(err) {
-				ERRLOG("[path] <source> %s does not exist.", rootDir)
+				errLog.Printf("[path] <source> %s does not exist.", rootDir)
 				os.Exit(1)
 			}
 		}
@@ -279,7 +277,7 @@ func main() {
 
 	if rootDir != "" {
 		if err := filepath.Walk(rootDir, visit); err != nil {
-			ERRLOG("[walk] %s", err)
+			errLog.Printf("[walk] %s", err)
 		}
 	} else {
 		// start scanner and wait for stdin
@@ -288,12 +286,12 @@ func main() {
 
 			text := strings.Replace(scanner.Text(), "\n", "", -1)
 			if strings.HasPrefix(text, "[") {
-				ERRLOG("[stdin] %s", text)
+				errLog.Printf("[stdin] %s", text)
 				continue
 			} else {
 				finfo, err := os.Stat(text)
 				if err != nil {
-					ERRLOG("[stat] %s", text)
+					errLog.Printf("[stat] %s", text)
 					continue
 				}
 				visit(text, finfo, nil)
