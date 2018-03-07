@@ -3,12 +3,12 @@ crop sections out of an image
 
 usage of ./tscrop:
 
-centered crop to 1920x1080
-	./tscrop -center -c1 1920,1080
-cut out 120,10 to 400,60
-	./tscrop -c1 120,10 c2 400,60
-centered crop to 1920x1080 and output to <destination>
-	./tscrop -center -c1 1920,1080 -output <destination>
+	centered crop to 1920x1080
+		./tscrop -center -c1 1920,1080
+	cut out 120,10 to 400,60
+		./tscrop -c1 120,10 c2 400,60
+	centered crop to 1920x1080 and output to <destination>
+		./tscrop -center -c1 1920,1080 -output <destination>
 
 flags:
 
