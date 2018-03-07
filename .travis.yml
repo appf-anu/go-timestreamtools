@@ -16,9 +16,17 @@ before_script:
   - go get golang.org/x/image/tiff
   - go get github.com/bcampbell/fuzzytime
   - go get github.com/oliamb/cutter
+  - go get github.com/golang/lint/golint
 
 
 script:
+  - golint /tsselect -set_exit_status
+  - golint /tsresize -set_exit_status
+  - golint /tsrename -set_exit_status
+  - golint /tsorganize -set_exit_status
+  - golint /tscrop -set_exit_status
+  - golint /tsarchive -set_exit_status
+  - golint /tsalign -set_exit_status
   - ./build.sh ./tsalign
   - ./build.sh ./tsarchive
   - ./build.sh ./tscrop
@@ -27,33 +35,20 @@ script:
   - ./build.sh ./tsresize
   - ./build.sh ./tsselect
 
+before_deploy:
+  - tar -zcvf windows.tar.gz *_win*
+  - tar -zcvf darwind.tar.gz *_darwin*
+  - tar -zcvf linux.tar.gz *_linux*
 
 deploy:
-  - provider: releases
-    api_key: $TOKEN
-    file_glob: true
-    file: "*_win*"
-    name: Build $(date +'%Y-%m-%dT%R') - WIN
-    skip_cleanup: true
-    on:
-      tags: true
-
-
-  - provider: releases
-    api_key: $TOKEN
-    file_glob: true
-    file: "*_linux*"
-    name: Build $(date +'%Y-%m-%dT%R') - LINUX
-    skip_cleanup: true
-    on:
-      tags: true
-
-
-  - provider: releases
-    api_key: $TOKEN
-    file_glob: true
-    file: "*_darwin*"
-    name: Build $(date +'%Y-%m-%dT%R') - DARWIN
-    skip_cleanup: true
-    on:
-      tags: true
+  provider: releases
+  api_key: $TOKEN
+  file_glob: true
+  file:
+    - "windows.tar.gz"
+    - "darwin.tar.gz"
+    - "lunix.tar.gz"
+  name: Release $TRAVIS_TAG
+  skip_cleanup: true
+  on:
+    tags: true
