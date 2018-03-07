@@ -33,19 +33,19 @@ deploy:
     api_key: $TOKEN
     file_glob: true
     file: "*_win*"
-    name: Build $(date +'%d.%m.%Y %R') - WIN
+    name: Build $(date +'%Y-%m-%dT%R') - WIN
     skip_cleanup: true
 
   - provider: releases
     api_key: $TOKEN
     file_glob: true
     file: "*_linux*"
-    name: Build $(date +'%d.%m.%Y %R') - LINUX
+    name: Build $(date +'%Y-%m-%dT%R') - LINUX
     skip_cleanup: true
 
   - provider: releases
     api_key: $TOKEN
     file_glob: true
     file: "*_darwin*"
-    name: Build $(date +'%d.%m.%Y %R') - DARWIN
+    name: Build $(date +'%Y-%m-%dT%R') - DARWIN
     skip_cleanup: true
