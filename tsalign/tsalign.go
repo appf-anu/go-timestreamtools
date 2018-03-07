@@ -9,6 +9,7 @@ import (
 	"github.com/rwcarlsen/goexif/exif"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -33,11 +34,9 @@ var (
 
 var /* const */ tsRegex = regexp.MustCompile(tsRegexPattern)
 
-func ERRLOG(format string, a ...interface{}) (n int, err error) {
-	return fmt.Fprintf(os.Stderr, format+"\n", a...)
-}
+var errLog *log.Logger
 
-func OUTPUT(a ...interface{}) (n int, err error) {
+func outputPath(a ...interface{}) (n int, err error) {
 	return fmt.Fprintln(os.Stdout, a...)
 }
 
@@ -78,7 +77,7 @@ func parseExifDatetime(datetimeString string) (time.Time, error) {
 	return thisTime, nil
 }
 
-type ExifFromJSON struct {
+type exifFromJSON struct {
 	DateTime          string
 	DateTimeOriginal  string
 	DateTimeDigitized string
@@ -88,15 +87,15 @@ func getTimeFromExif(thisFile string) (datetime time.Time, err error) {
 
 	var datetimeString string
 	if _, ferr := os.Stat(thisFile + ".json"); ferr == nil {
-		eData := ExifFromJSON{}
+		eData := exifFromJSON{}
 		//	do something with the json.
 
 		byt, err := ioutil.ReadFile(thisFile + ".json")
 		if err != nil {
-			ERRLOG("[json] cant read file %s", err)
+			errLog.Printf("[json] cant read file %s\n", err)
 		}
 		if err := json.Unmarshal(byt, &eData); err != nil {
-			ERRLOG("[json] can't unmarshal %s", err)
+			errLog.Printf("[json] can't unmarshal %s\n", err)
 		}
 
 		datetimeString = eData.DateTime
@@ -111,7 +110,7 @@ func getTimeFromExif(thisFile string) (datetime time.Time, err error) {
 		exifData, err := exif.Decode(fileHandler)
 		if err != nil {
 			// exif wouldnt decode
-			return time.Time{}, errors.New(fmt.Sprintf("[exif] couldn't decode exif from image %s", err))
+			return time.Time{}, fmt.Errorf("[exif] couldn't decode exif from image %s", err)
 		}
 		dt, err := exifData.Get(exif.DateTime) // normally, don't ignore errors!
 		if err != nil {
@@ -125,7 +124,7 @@ func getTimeFromExif(thisFile string) (datetime time.Time, err error) {
 		}
 	}
 	if datetime, err = parseExifDatetime(datetimeString); err != nil {
-		ERRLOG("[parse] parse datetime %s", err)
+		errLog.Printf("[parse] parse datetime %s\n", err)
 	}
 	return
 }
@@ -134,7 +133,7 @@ func getTimeFromFileTimestamp(thisFile string) (time.Time, error) {
 	timestamp := tsRegex.FindString(thisFile)
 	if len(timestamp) < 1 {
 		// no timestamp found in filename
-		return time.Time{}, errors.New("failed regex timestamp from filename")
+		return time.Time{}, errors.New("[path] failed regex timestamp from filename")
 	}
 
 	t, err := time.Parse(tsForm, timestamp)
@@ -160,7 +159,7 @@ func alignedFilename(thisFile string) (string, error) {
 	targetFilename := strings.Replace(thisFile, thisTime.Format(tsForm), aligned.Format(tsForm), 1)
 	// make sure that if its already formatted as a timestream that we reformat the timestream structure.
 	targetFilename = strings.Replace(targetFilename, thisTime.Format(tsDirStruct), aligned.Format(tsDirStruct), 1)
-	if del{
+	if del {
 		return targetFilename, nil
 	}
 
@@ -179,7 +178,7 @@ func moveOrRename(source, dest string) error {
 		err = moveFilebyCopy(source, dest)
 	}
 	if err != nil {
-		ERRLOG("[move] %s", err)
+		errLog.Printf("[move] %s\n", err)
 		return nil
 	}
 	return err
@@ -197,27 +196,29 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 	// parse the new filepath
 	newPath, err := alignedFilename(filePath)
 	if err != nil {
-		ERRLOG("[parse] %s", err)
+		errLog.Printf("[parse] %s\n", err)
 		return nil
 	}
+	newPath = filepath.Join(outputDir, strings.Replace(newPath, rootDir, "", 1))
 
+	fmt.Println(newPath)
 	if _, err := os.Stat(newPath); err == nil {
 		// skip existing.
-		ERRLOG("[skipped] %s", filePath)
+		errLog.Printf("[skipped] %s\n", filePath)
 		return nil
 	}
 
 	// make directories
 	err = os.MkdirAll(path.Dir(newPath), 0755)
 	if err != nil {
-		ERRLOG("[mkdir] %s", err)
+		errLog.Printf("[mkdir] %s\n", err)
 		return nil
 	}
 
 	absSrc, _ := filepath.Abs(filePath)
 	absDest, _ := filepath.Abs(newPath)
 	if absSrc == absDest {
-		ERRLOG("[dupe] %s", absDest)
+		errLog.Printf("[dupe] %s\n", absDest)
 		return nil
 	}
 
@@ -225,42 +226,39 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 	jsFile := filePath + ".json"
 	if _, ferr := os.Stat(jsFile); ferr == nil {
 		if e := moveOrRename(jsFile, absDest+".json"); e != nil {
-			ERRLOG("[exif] couldn't move json exif file")
+			errLog.Println("[exif] couldn't move json exif file")
 		}
 	}
-
-	OUTPUT(newPath)
-
+	outputPath(newPath)
 	return err
 }
 
 var usage = func() {
-	ERRLOG("usage of %s:", os.Args[0])
-	ERRLOG("\talign images in place:")
-	ERRLOG("\t\t%s -source <source> -output <source>", os.Args[0])
-	ERRLOG("\t copy aligned to <destination>:")
-	ERRLOG("\t\t%s -source <source> -output=<destination>", os.Args[0])
+	fmt.Printf("usage of %s:\n", os.Args[0])
+	fmt.Println("\talign images in place:")
+	fmt.Printf("\t\t%s -source <source> -output <source>\n", os.Args[0])
+	fmt.Println("\t copy aligned to <destination>:")
+	fmt.Printf("\t\t%s -source <source> -output=<destination>\n", os.Args[0])
 
-	ERRLOG("")
-	ERRLOG("flags:")
-	ERRLOG("\t-name: renames the prefix fo the target files")
-	ERRLOG("\t-exif: uses exif data to rename rather than file timestamp")
+	fmt.Println("")
+	fmt.Println("flags:")
+	fmt.Println("\t-name: renames the prefix fo the target files")
+	fmt.Println("\t-exif: uses exif data to rename rather than file timestamp")
 	pwd, _ := os.Getwd()
-	ERRLOG("\t-output: set the <destination> directory (default=%s)", pwd)
-	ERRLOG("\t-source: set the <source> directory (optional, default=stdin)")
-	ERRLOG("\t-interval: set the interval to align to (optional, default=5m)")
-	ERRLOG("")
-	ERRLOG("reads filepaths from stdin")
-	ERRLOG("will ignore any line from stdin that isnt a filepath (and only a filepath)")
-
-	ERRLOG("")
-	ERRLOG("will only align down, if an image is at 10:03 (5m interval) it will align to 10:00")
-	ERRLOG("chronologically earlier images will be kept")
-	ERRLOG("ie. at 5m interval, an image at 10:03 will overwrite an image at 10:02")
-
+	fmt.Printf("\t-output: set the <destination> directory (default=%s)\n", pwd)
+	fmt.Println("\t-source: set the <source> directory (optional, default=stdin)")
+	fmt.Println("\t-interval: set the interval to align to (optional, default=5m)")
+	fmt.Println("")
+	fmt.Println("reads filepaths from stdin")
+	fmt.Println("will ignore any line from stdin that isnt a filepath (and only a filepath)")
+	fmt.Println("")
+	fmt.Println("will only align down, if an image is at 10:03 (5m interval) it will align to 10:00")
+	fmt.Println("chronologically earlier images will be kept")
+	fmt.Println("ie. at 5m interval, an image at 10:03 will overwrite an image at 10:02")
 }
 
 func init() {
+	errLog = log.New(os.Stderr, "[ERR] ", log.Ldate|log.Ltime|log.Lshortfile)
 	flag.Usage = usage
 	// set flags for flagset
 
@@ -281,7 +279,7 @@ func init() {
 	if rootDir != "" {
 		if _, err := os.Stat(rootDir); err != nil {
 			if os.IsNotExist(err) {
-				ERRLOG("[path] <source> %s does not exist.", rootDir)
+				errLog.Printf("[path] <source> %s does not exist.", rootDir)
 				os.Exit(1)
 			}
 		}
@@ -302,7 +300,7 @@ func init() {
 func main() {
 	if !stdin {
 		if err := filepath.Walk(rootDir, visit); err != nil {
-			ERRLOG("[walk] %s", err)
+			errLog.Printf("[walk] %s", err)
 		}
 	} else {
 		// start scanner and wait for stdin
@@ -310,25 +308,16 @@ func main() {
 		for scanner.Scan() {
 			text := strings.Replace(scanner.Text(), "\n", "", -1)
 			if strings.HasPrefix(text, "[") {
-				ERRLOG("[stdin] %s", text)
+				errLog.Printf("[stdin] %s", text)
 				continue
 			} else {
 				finfo, err := os.Stat(text)
 				if err != nil {
-					ERRLOG("[stat] %s", text)
+					errLog.Printf("[stat] %s", text)
 					continue
 				}
 				visit(text, finfo, nil)
 			}
 		}
 	}
-
-	//c := make(chan error)
-	//go func() {
-	//	c <- filepath.Walk(rootDir, visit)
-	//}()
-	//
-	//if err := <-c; err != nil {
-	//	fmt.Println(err)
-	//}
 }
