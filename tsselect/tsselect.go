@@ -9,6 +9,7 @@ import (
 	"github.com/bcampbell/fuzzytime"
 	"github.com/rwcarlsen/goexif/exif"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -23,6 +24,7 @@ const (
 )
 
 var (
+	errLog       *log.Logger
 	rootDir      string
 	start, end   time.Time
 	datetimeFunc datetimeFunction
@@ -30,11 +32,7 @@ var (
 
 var /* const */ tsRegex = regexp.MustCompile(tsRegexPattern)
 
-func ERRLOG(format string, a ...interface{}) (n int, err error) {
-	return fmt.Fprintf(os.Stderr, format+"\n", a...)
-}
-
-func OUTPUT(a ...interface{}) (n int, err error) {
+func emitPath(a ...interface{}) (n int, err error) {
 	return fmt.Fprintln(os.Stdout, a...)
 }
 
@@ -48,7 +46,7 @@ func parseExifDatetime(datetimeString string) (time.Time, error) {
 	return thisTime, nil
 }
 
-type ExifFromJSON struct {
+type exifFromJSON struct {
 	DateTime          string
 	DateTimeOriginal  string
 	DateTimeDigitized string
@@ -58,15 +56,15 @@ func getTimeFromExif(thisFile string) (datetime time.Time, err error) {
 
 	var datetimeString string
 	if _, ferr := os.Stat(thisFile + ".json"); ferr == nil {
-		eData := ExifFromJSON{}
+		eData := exifFromJSON{}
 		//	do something with the json.
 
 		byt, err := ioutil.ReadFile(thisFile + ".json")
 		if err != nil {
-			ERRLOG("[json] cant read file %s", err)
+			errLog.Printf("[json] cant read file %s", err)
 		}
 		if err := json.Unmarshal(byt, &eData); err != nil {
-			ERRLOG("[json] can't unmarshal %s", err)
+			errLog.Printf("[json] can't unmarshal %s", err)
 		}
 
 		datetimeString = eData.DateTime
@@ -81,7 +79,7 @@ func getTimeFromExif(thisFile string) (datetime time.Time, err error) {
 		exifData, err := exif.Decode(fileHandler)
 		if err != nil {
 			// exif wouldnt decode
-			return time.Time{}, errors.New(fmt.Sprintf("[exif] couldn't decode exif from image %s", err))
+			return time.Time{}, fmt.Errorf("[exif] couldn't decode exif from image %s", err)
 		}
 		dt, err := exifData.Get(exif.DateTime) // normally, don't ignore errors!
 		if err != nil {
@@ -95,7 +93,7 @@ func getTimeFromExif(thisFile string) (datetime time.Time, err error) {
 		}
 	}
 	if datetime, err = parseExifDatetime(datetimeString); err != nil {
-		ERRLOG("[parse] parse datetime %s", err)
+		errLog.Printf("[parse] parse datetime %s", err)
 	}
 	return
 }
@@ -135,35 +133,36 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 	}
 
 	if ok, err := checkFilePath(filePath); ok {
-		OUTPUT(filePath)
+		emitPath(filePath)
 	} else if err != nil {
-		ERRLOG("[check] %s", err)
+		errLog.Printf("[check] %s", err)
 	}
 
 	return nil
 }
 
 var usage = func() {
-	ERRLOG("usage of %s:", os.Args[0])
-	ERRLOG("\tfilter from 11 June 1996 until now with source:")
-	ERRLOG("\t\t %s -source <source> -start 1996-06-11", os.Args[0])
-	ERRLOG("\tfilter from 11 June 1996 to 10 December 1996 from stdin:")
-	ERRLOG("\t\t %s -start 1996-06-11 -end 1996-12-10", os.Args[0])
-	ERRLOG("")
-	ERRLOG("flags:")
-	ERRLOG("\t-start: the start datetime (default=1970-01-01 00:00)")
-	ERRLOG("\t-end: the end datetime (default=now)")
-	ERRLOG("\t-exif: uses exif data to get time instead of the file timestamp")
-	ERRLOG("\t-source: set the <source> directory (optional, default=stdin)")
-	ERRLOG("")
-	ERRLOG("writes paths to resulting files to stdout")
-	ERRLOG("reads filepaths from stdin")
-	ERRLOG("will ignore any line from stdin that isnt a filepath (and only a filepath)")
-	ERRLOG("dates are assumed to be DMY or YMD not MDY")
+	fmt.Printf("usage of %s:", os.Args[0])
+	fmt.Println("\tfilter from 11 June 1996 until now with source:")
+	fmt.Printf("\t\t %s -source <source> -start 1996-06-11", os.Args[0])
+	fmt.Println("\tfilter from 11 June 1996 to 10 December 1996 from stdin:")
+	fmt.Printf("\t\t %s -start 1996-06-11 -end 1996-12-10", os.Args[0])
+	fmt.Println("")
+	fmt.Println("flags:")
+	fmt.Println("\t-start: the start datetime (default=1970-01-01 00:00)")
+	fmt.Println("\t-end: the end datetime (default=now)")
+	fmt.Println("\t-exif: uses exif data to get time instead of the file timestamp")
+	fmt.Println("\t-source: set the <source> directory (optional, default=stdin)")
+	fmt.Println("")
+	fmt.Println("writes paths to resulting files to stdout")
+	fmt.Println("reads filepaths from stdin")
+	fmt.Println("will ignore any line from stdin that isnt a filepath (and only a filepath)")
+	fmt.Println("dates are assumed to be DMY or YMD not MDY")
 
 }
 
 func init() {
+	errLog = log.New(os.Stderr, "[tsselect] ", log.Ldate|log.Ltime|log.Lshortfile)
 	flag.Usage = usage
 	// set flags for flagset
 
@@ -186,7 +185,7 @@ func init() {
 	}
 	startDatetime, _, err := ctx.Extract(*startString)
 	if err != nil {
-		ERRLOG("[time] couldn't extract start datetime: %s", err)
+		errLog.Printf("[time] couldn't extract start datetime: %s", err)
 	}
 
 	if startDatetime.Empty() {
@@ -200,7 +199,7 @@ func init() {
 	}
 	endDatetime, _, err := ctx.Extract(*endString)
 	if err != nil {
-		ERRLOG("[time] couldn't extract end datetime: %s", err)
+		errLog.Printf("[time] couldn't extract end datetime: %s", err)
 	}
 
 	if endDatetime.Empty() {
@@ -217,7 +216,7 @@ func init() {
 	if rootDir != "" {
 		if _, err := os.Stat(rootDir); err != nil {
 			if os.IsNotExist(err) {
-				ERRLOG("[path] <source> %s does not exist.", rootDir)
+				errLog.Printf("[path] <source> %s does not exist.", rootDir)
 				os.Exit(1)
 			}
 		}
@@ -229,7 +228,7 @@ func main() {
 
 	if rootDir != "" {
 		if err := filepath.Walk(rootDir, visit); err != nil {
-			ERRLOG("[walk] %s", err)
+			errLog.Printf("[walk] %s", err)
 		}
 	} else {
 		// start scanner and wait for stdin
@@ -238,12 +237,12 @@ func main() {
 
 			text := strings.Replace(scanner.Text(), "\n", "", -1)
 			if strings.HasPrefix(text, "[") {
-				ERRLOG("[stdin] %s", text)
+				errLog.Printf("[stdin] %s", text)
 				continue
 			} else {
 				finfo, err := os.Stat(text)
 				if err != nil {
-					ERRLOG("[stat] %s", text)
+					errLog.Printf("[stat] %s", text)
 					continue
 				}
 				visit(text, finfo, nil)

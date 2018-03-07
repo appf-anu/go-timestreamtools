@@ -12,6 +12,7 @@ import (
 	"image"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -21,17 +22,14 @@ import (
 )
 
 var (
+	errLog                              *log.Logger
 	rootDir, outputDir, targetExtension string
 	corner1, corner2, gridxy, chunkSize image.Point
 	stdin, center                       bool
 	imageEncoder                        imgio.Encoder
 )
 
-func ERRLOG(format string, a ...interface{}) (n int, err error) {
-	return fmt.Fprintf(os.Stderr, format+"\n", a...)
-}
-
-func OUTPUT(a ...interface{}) (n int, err error) {
+func emitPath(a ...interface{}) (n int, err error) {
 	return fmt.Fprintln(os.Stdout, a...)
 }
 
@@ -42,7 +40,7 @@ func TIFFEncoder(compressionType tiff.CompressionType) imgio.Encoder {
 	}
 }
 
-func MinMax(a, b int) (min, max int) {
+func minMax(a, b int) (min, max int) {
 	if a < b {
 		min = a
 		max = b
@@ -73,16 +71,16 @@ func getExifData(thisFile string) ([]byte, error) {
 	return jsonBytes, nil
 }
 
-func writeExifJson(sourcePath, destPath string) {
-	exifJson, exifJSONErr := getExifData(sourcePath)
+func writeExifJSON(sourcePath, destPath string) {
+	exifJSON, exifJSONErr := getExifData(sourcePath)
 
 	if exifJSONErr != nil {
-		ERRLOG("[exif] couldnt read data from %s", sourcePath)
+		errLog.Printf("[exif] couldnt read data from %s", sourcePath)
 	}
-	if len(exifJson) > 0 {
-		exifJSONErr := ioutil.WriteFile(destPath+".json", exifJson, 0644)
+	if len(exifJSON) > 0 {
+		exifJSONErr := ioutil.WriteFile(destPath+".json", exifJSON, 0644)
 		if exifJSONErr != nil {
-			ERRLOG("[exif] couldnt write json %s", destPath)
+			errLog.Printf("[exif] couldnt write json %s", destPath)
 		}
 	}
 }
@@ -108,11 +106,11 @@ func cropImage(sourcePath, destPath string) (err error) {
 		})
 	}
 	var wg sync.WaitGroup
-	wg.Add(gridxy.X*gridxy.Y)
+	wg.Add(gridxy.X * gridxy.Y)
 
 	for xPos := 0; xPos < gridxy.X; xPos++ {
 		for yPos := 0; yPos < gridxy.Y; yPos++ {
-			go func(xPos, yPos int){
+			go func(xPos, yPos int) {
 				defer wg.Done()
 				cropped, cropErr := cutter.Crop(cropImage, cutter.Config{
 					Width:  chunkSize.X,
@@ -122,7 +120,7 @@ func cropImage(sourcePath, destPath string) (err error) {
 				})
 
 				if cropErr != nil {
-					ERRLOG("[crop] error cropping: %s", cropErr)
+					errLog.Printf("[crop] error cropping: %s", cropErr)
 					return
 				}
 
@@ -132,11 +130,11 @@ func cropImage(sourcePath, destPath string) (err error) {
 
 				writeErr := imgio.Save(destPath, cropped, imageEncoder)
 				if writeErr != nil {
-					ERRLOG("[crop] error saving crop: %s", cropErr)
+					errLog.Printf("[crop] error saving crop: %s", cropErr)
 					return
 				}
 				// output the relative image path
-				OUTPUT(destPath)
+				emitPath(destPath)
 			}(xPos, yPos)
 		}
 	}
@@ -162,42 +160,42 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 	// parse the new filepath
 	noExtension := strings.TrimSuffix(basePath, ext)
 	newBase := fmt.Sprintf("%s.%s", noExtension, targetExtension)
-	writeExifJson(filePath, path.Join(outputDir, newBase))
+	writeExifJSON(filePath, path.Join(outputDir, newBase))
 	newPath := path.Join(outputDir, "%s", newBase)
 
 	// convert the image
 	if err := cropImage(filePath, newPath); err != nil {
-		ERRLOG("[crop] %s", err)
+		errLog.Printf("[crop] %s", err)
 		return nil
 	}
 	return nil
 }
 
 var usage = func() {
-	ERRLOG("usage of %s:", os.Args[0])
-	ERRLOG("centered crop to 1920x1080")
-	ERRLOG("\t%s -center -c1 1920,1080", os.Args[0])
-	ERRLOG("cut out 120,10 to 400,60")
-	ERRLOG("\t%s -c1 120,10 c2 400,60", os.Args[0])
-	ERRLOG("centered crop to 1920x1080 and output to <destination>")
-	ERRLOG("\t%s -center -c1 1920,1080 -output <destination>", os.Args[0])
-	ERRLOG("")
-	ERRLOG("flags:")
+	errLog.Printf("usage of %s:", os.Args[0])
+	errLog.Printf("centered crop to 1920x1080")
+	errLog.Printf("\t%s -center -c1 1920,1080", os.Args[0])
+	errLog.Printf("cut out 120,10 to 400,60")
+	errLog.Printf("\t%s -c1 120,10 c2 400,60", os.Args[0])
+	errLog.Printf("centered crop to 1920x1080 and output to <destination>")
+	errLog.Printf("\t%s -center -c1 1920,1080 -output <destination>", os.Args[0])
+	errLog.Printf("")
+	errLog.Printf("flags:")
 	pwd, _ := os.Getwd()
-	ERRLOG("\t-center: center the crop, specify width,height with c1 ")
-	ERRLOG("\t-c1: corner 1 (in pixels, comma separated)")
-	ERRLOG("\t-c2: corner 2 (in pixels, comma separated, ignored if center is specified)")
-	ERRLOG("\t-grid: split the area into this many equal crops (default=1,1)")
-	ERRLOG("\t-type: set the output image type (default=jpeg)")
-	ERRLOG("\t\tavailable image types:")
-	ERRLOG("\t\tjpeg, png")
-	ERRLOG("\t\ttiff: tiff with Deflate compression (alias for tiff-deflate)")
-	ERRLOG("\t\ttiff-none: tiff with no compression")
-	ERRLOG("\t-output: set the <destination> directory (default=%s/<crop>)", pwd)
-	ERRLOG("")
-	ERRLOG("writes paths to resulting files to stdout")
-	ERRLOG("reads filepaths from stdin")
-	ERRLOG("will ignore any line from stdin that isnt a filepath (and only a filepath)")
+	errLog.Printf("\t-center: center the crop, specify width,height with c1 ")
+	errLog.Printf("\t-c1: corner 1 (in pixels, comma separated)")
+	errLog.Printf("\t-c2: corner 2 (in pixels, comma separated, ignored if center is specified)")
+	errLog.Printf("\t-grid: split the area into this many equal crops (default=1,1)")
+	errLog.Printf("\t-type: set the output image type (default=jpeg)")
+	errLog.Printf("\t\tavailable image types:")
+	errLog.Printf("\t\tjpeg, png")
+	errLog.Printf("\t\ttiff: tiff with Deflate compression (alias for tiff-deflate)")
+	errLog.Printf("\t\ttiff-none: tiff with no compression")
+	errLog.Printf("\t-output: set the <destination> directory (default=%s/<crop>)", pwd)
+	errLog.Printf("")
+	errLog.Printf("writes paths to resulting files to stdout")
+	errLog.Printf("reads filepaths from stdin")
+	errLog.Printf("will ignore any line from stdin that isnt a filepath (and only a filepath)")
 }
 
 func stringToPoint(str, sep string) (image.Point, error) {
@@ -218,6 +216,7 @@ func stringToPoint(str, sep string) (image.Point, error) {
 }
 
 func init() {
+	errLog = log.New(os.Stderr, "[tscrop] ", log.Ldate|log.Ltime|log.Lshortfile)
 	flag.Usage = usage
 	// set flags for flag
 	flag.StringVar(&rootDir, "source", "", "source directory")
@@ -255,28 +254,28 @@ func init() {
 	var err error
 	corner1, err = stringToPoint(*c1, ",")
 	if err != nil {
-		ERRLOG("[flag] %s", err)
+		errLog.Printf("[flag] %s", err)
 		panic(err)
 	}
 	corner2, err = stringToPoint(*c2, ",")
 	if err != nil && !center {
-		ERRLOG("[flag] %s", err)
+		errLog.Printf("[flag] %s", err)
 		panic(err)
 	}
 
 	if !center {
 		// sort corners for topleft and topright if not centered
-		corner1.X, corner2.X = MinMax(corner1.X, corner2.X)
-		corner1.Y, corner2.Y = MinMax(corner1.Y, corner2.Y)
+		corner1.X, corner2.X = minMax(corner1.X, corner2.X)
+		corner1.Y, corner2.Y = minMax(corner1.Y, corner2.Y)
 		if corner1 == corner2 {
-			ERRLOG("[flag] crop area is 0")
+			errLog.Printf("[flag] crop area is 0")
 			os.Exit(2)
 		}
 	}
 
 	gridxy, err = stringToPoint(*grid, ",")
 	if err != nil {
-		ERRLOG("[flag] %s", err)
+		errLog.Printf("[flag] %s", err)
 		panic(err)
 	}
 	chunkSize = image.Point{}
@@ -291,7 +290,7 @@ func init() {
 	if rootDir != "" {
 		if _, err := os.Stat(rootDir); err != nil {
 			if os.IsNotExist(err) {
-				ERRLOG("[path] <source> %s does not exist.", rootDir)
+				errLog.Printf("[path] <source> %s does not exist.", rootDir)
 				os.Exit(1)
 			}
 		}
@@ -319,11 +318,11 @@ func main() {
 		}()
 
 		if err := <-c; err != nil {
-			ERRLOG("[goroutine] %s", err)
+			errLog.Printf("[goroutine] %s", err)
 		}
 		return
 		//if err := filepath.Walk(rootDir, visit); err != nil {
-		//	ERRLOG("[walk] %s", err)
+		//	errLog.Printf("[walk] %s", err)
 		//}
 		//return
 	}
@@ -332,12 +331,12 @@ func main() {
 	for scanner.Scan() {
 		text := strings.Replace(scanner.Text(), "\n", "", -1)
 		if strings.HasPrefix(text, "[") {
-			ERRLOG("[stdin] %s", text)
+			errLog.Printf("[stdin] %s", text)
 			continue
 		} else {
 			finfo, err := os.Stat(text)
 			if err != nil {
-				ERRLOG("[stat] %s", err)
+				errLog.Printf("[stat] %s", err)
 				continue
 			}
 			visit(text, finfo, nil)

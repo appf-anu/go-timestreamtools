@@ -21,3 +21,10 @@ test-data
 !*.md
 !README
 
+tsalign/tsalign
+tsarchive/tsarchive
+tscrop/tscrop
+tsorganize/tsorganise
+tsrename/tsrename
+tsresize/tsresize
+tsselect/tsselect

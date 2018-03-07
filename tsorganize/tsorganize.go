@@ -9,13 +9,13 @@ import (
 	"github.com/rwcarlsen/goexif/exif"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
-  "log"
 )
 
 const (
@@ -25,14 +25,13 @@ const (
 )
 
 var (
+	errLog                          *log.Logger
 	rootDir, outputDir, tsDirStruct string
-	del                bool
-	datetimeFunc       datetimeFunction
+	del                             bool
+	datetimeFunc                    datetimeFunction
 )
 
 var /* const */ tsRegex = regexp.MustCompile(tsRegexPattern)
-
-var errLog *log.Logger
 
 func emitPath(a ...interface{}) (n int, err error) {
 	return fmt.Fprintln(os.Stdout, a...)
@@ -75,7 +74,7 @@ func parseExifDatetime(datetimeString string) (time.Time, error) {
 	return thisTime, nil
 }
 
-type ExifFromJSON struct {
+type exifFromJSON struct {
 	DateTime          string
 	DateTimeOriginal  string
 	DateTimeDigitized string
@@ -85,7 +84,7 @@ func getTimeFromExif(thisFile string) (datetime time.Time, err error) {
 
 	var datetimeString string
 	if _, ferr := os.Stat(thisFile + ".json"); ferr == nil {
-		eData := ExifFromJSON{}
+		eData := exifFromJSON{}
 		//	do something with the json.
 
 		byt, err := ioutil.ReadFile(thisFile + ".json")
@@ -241,7 +240,7 @@ var usage = func() {
 }
 
 func init() {
-  errLog = log.New(os.Stderr, "[ERR] ", log.Ldate|log.Ltime|log.Lshortfile)
+	errLog = log.New(os.Stderr, "[tsorganise] ", log.Ldate|log.Ltime|log.Lshortfile)
 	flag.Usage = usage
 	// set flags for flagset
 	flag.StringVar(&rootDir, "source", "", "source directory")

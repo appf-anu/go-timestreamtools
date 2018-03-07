@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -15,11 +16,7 @@ import (
 	"time"
 )
 
-func ERRLOG(format string, a ...interface{}) (n int, err error) {
-	return fmt.Fprintf(os.Stderr, format+"\n", a...)
-}
-
-func OUTPUT(a ...interface{}) (n int, err error) {
+func emitPath(a ...interface{}) (n int, err error) {
 	return fmt.Fprintln(os.Stdout, a...)
 }
 
@@ -32,6 +29,7 @@ const (
 var /* const */ tsRegex = regexp.MustCompile(tsRegexPattern)
 
 var (
+	errLog                          *log.Logger
 	rootDir, outputDir, archiveName string
 	weeklyFileWriter                []*os.File
 	weeklyTarWriters                map[time.Time]*tar.Writer
@@ -109,7 +107,7 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 
 	t, err := getTimeFromFileTimestamp(filePath)
 	if err != nil {
-		ERRLOG("%s", err)
+		errLog.Printf("%s", err)
 		return nil
 	}
 	sunday := truncateTimeToSunday(t)
@@ -119,44 +117,45 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 		tarPath := path.Join(outputDir, tarbaseName)
 		file, err := os.Create(tarPath)
 		if err != nil {
-			ERRLOG("%s", err)
+			errLog.Printf("%s", err)
 			panic(err)
 		}
 		weeklyFileWriter = append(weeklyFileWriter, file)
 		weeklyTarWriters[sunday] = tar.NewWriter(file)
-		ERRLOG("[tar] opened %s tar writer", sunday.Format("2006-01-02"))
+		errLog.Printf("[tar] opened %s tar writer", sunday.Format("2006-01-02"))
 	}
 
 	if err := addFile(weeklyTarWriters[sunday], filePath); err != nil {
-		ERRLOG("%s", err)
+		errLog.Printf("%s", err)
 		return nil
 	}
 
 	if absPath, err := filepath.Abs(filePath); err == nil {
-		OUTPUT(absPath)
+		emitPath(absPath)
 	} else {
-		OUTPUT(filePath)
+		emitPath(filePath)
 	}
 	return nil
 }
 
 var usage = func() {
-	ERRLOG("usage of %s:\n", os.Args[0])
-	ERRLOG("\tarchive files from directory:\n")
-	ERRLOG("\t\t %s -source <source> -output <output>\n", os.Args[0])
+	fmt.Printf("usage of %s:\n", os.Args[0])
+	fmt.Println("\tarchive files from directory: ")
+	fmt.Printf("\t\t %s -source <source> -output <output>\n", os.Args[0])
 
-	ERRLOG("")
-	ERRLOG("flags:\n")
+	fmt.Println("")
+	fmt.Println("flags: ")
 	pwd, _ := os.Getwd()
-	ERRLOG("\t-output: set the <destination> directory (default=%s)\n", pwd)
-	ERRLOG("\t-source: set the <source> directory (optional, default=stdin)\n", pwd)
-	ERRLOG("\t-name: set the name prefix of the output tarfile <name>2006-01-02.tar (default=guess)\n", pwd)
-	ERRLOG("")
-	ERRLOG("reads filepaths from stdin")
-	ERRLOG("will ignore any line from stdin that isnt a filepath (and only a filepath)")
+	fmt.Printf("\t-output: set the <destination> directory (default=%s)\n", pwd)
+	fmt.Printf("\t-source: set the <source> directory (optional, default=stdin)\n", pwd)
+	fmt.Printf("\t-name: set the name prefix of the output tarfile <name>2006-01-02.tar (default=guess)\n", pwd)
+	fmt.Println("")
+	fmt.Println("reads filepaths from stdin")
+	fmt.Println("will ignore any line from stdin that isnt a filepath (and only a filepath)")
 }
 
 func init() {
+	errLog = log.New(os.Stderr, "[tsarchive] ", log.Ldate|log.Ltime|log.Lshortfile)
 	flag.Usage = usage
 	// set flags for flagset
 	flag.StringVar(&rootDir, "source", "", "source directory")
@@ -169,7 +168,7 @@ func init() {
 	if rootDir != "" {
 		if _, err := os.Stat(rootDir); err != nil {
 			if os.IsNotExist(err) {
-				ERRLOG("[path] <source> %s does not exist.", rootDir)
+				errLog.Printf("[path] <source> %s does not exist.", rootDir)
 				os.Exit(1)
 			}
 		}
@@ -182,7 +181,7 @@ func init() {
 		} else {
 			outputDir = rootDir
 		}
-		ERRLOG("[path] no <destination>, creating %s", outputDir)
+		errLog.Printf("[path] no <destination>, creating %s", outputDir)
 	}
 	if _, err := os.Stat(outputDir); err != nil {
 		os.MkdirAll(outputDir, 0755)
@@ -194,7 +193,7 @@ func main() {
 	weeklyTarWriters = make(map[time.Time]*tar.Writer)
 	if rootDir != "" {
 		if err := filepath.Walk(rootDir, visit); err != nil {
-			ERRLOG("[walk] %s", err)
+			errLog.Printf("[walk] %s", err)
 		}
 	} else {
 		// start scanner and wait for stdin
@@ -203,12 +202,12 @@ func main() {
 
 			text := strings.Replace(scanner.Text(), "\n", "", -1)
 			if strings.HasPrefix(text, "[") {
-				ERRLOG("[stdin] %s", text)
+				errLog.Printf("[stdin] %s", text)
 				continue
 			} else {
 				finfo, err := os.Stat(text)
 				if err != nil {
-					ERRLOG("[stat] %s", text)
+					errLog.Printf("[stat] %s", text)
 					continue
 				}
 				visit(text, finfo, nil)
@@ -217,7 +216,7 @@ func main() {
 	}
 
 	for sunday, writer := range weeklyTarWriters {
-		ERRLOG("[tar] closing %s tar writer", sunday.Format("2006-01-02"))
+		errLog.Printf("[tar] closing %s tar writer", sunday.Format("2006-01-02"))
 		writer.Close()
 	}
 

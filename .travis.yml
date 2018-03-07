@@ -17,16 +17,11 @@ before_script:
   - go get github.com/bcampbell/fuzzytime
   - go get github.com/oliamb/cutter
   - go get github.com/golang/lint/golint
-
+  - go get honnef.co/go/tools/cmd/megacheck
 
 script:
-  - golint /tsselect -set_exit_status
-  - golint /tsresize -set_exit_status
-  - golint /tsrename -set_exit_status
-  - golint /tsorganize -set_exit_status
-  - golint /tscrop -set_exit_status
-  - golint /tsarchive -set_exit_status
-  - golint /tsalign -set_exit_status
+  - golint /ts* -set_exit_status
+  - megacheck /ts*
   - ./build.sh ./tsalign
   - ./build.sh ./tsarchive
   - ./build.sh ./tscrop
@@ -47,7 +42,7 @@ deploy:
   file:
     - "windows.tar.gz"
     - "darwin.tar.gz"
-    - "lunix.tar.gz"
+    - "linux.tar.gz"
   name: Release $TRAVIS_TAG
   skip_cleanup: true
   on:

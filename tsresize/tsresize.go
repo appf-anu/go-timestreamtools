@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"errors"
 	"flag"
 	"fmt"
 	"github.com/anthonynsimon/bild/imgio"
@@ -10,27 +12,23 @@ import (
 	"image"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"bufio"
-	"errors"
 )
 
 var (
+	errLog                              *log.Logger
 	rootDir, outputDir, targetExtension string
-	resolution                                            image.Point
-	stdin                                                 bool
-	imageEncoder                                          imgio.Encoder
+	resolution                          image.Point
+	stdin                               bool
+	imageEncoder                        imgio.Encoder
 )
 
-func ERRLOG(format string, a ...interface{}) (n int, err error) {
-	return fmt.Fprintf(os.Stderr, format+"\n", a...)
-}
-
-func OUTPUT(a ...interface{}) (n int, err error) {
+func emitPath(a ...interface{}) (n int, err error) {
 	return fmt.Fprintln(os.Stdout, a...)
 }
 
@@ -61,30 +59,28 @@ func getExifData(thisFile string) ([]byte, error) {
 	return jsonBytes, nil
 }
 
-
-func writeExifJson(sourcePath, destPath string){
-	exifJson, exifJSONErr := getExifData(sourcePath)
+func writeExifJSON(sourcePath, destPath string) {
+	exifJSON, exifJSONErr := getExifData(sourcePath)
 
 	if exifJSONErr != nil {
-		ERRLOG("[exif] couldnt read data from %s", sourcePath)
+		errLog.Printf("[exif] couldnt read data from %s", sourcePath)
 	}
-	if len(exifJson) > 0 {
-		exifJSONErr := ioutil.WriteFile(destPath+".json", exifJson, 0644)
+	if len(exifJSON) > 0 {
+		exifJSONErr := ioutil.WriteFile(destPath+".json", exifJSON, 0644)
 		if exifJSONErr != nil {
-			ERRLOG("[exif] couldnt write json %s", destPath)
+			errLog.Printf("[exif] couldnt write json %s", destPath)
 		}
 	}
 }
 
-
 func convertImage(sourcePath, destPath string) (err error) {
-	writeExifJson(sourcePath, destPath)
+	writeExifJSON(sourcePath, destPath)
 
 	img, err := imgio.Open(sourcePath)
 	if err != nil {
 		return
 	}
-	if img == nil{
+	if img == nil {
 		return errors.New("[imgload] Nil img wtf")
 	}
 
@@ -115,44 +111,43 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 
 	// convert the image
 	if err := convertImage(filePath, newPath); err != nil {
-		ERRLOG("[convert] %s", err)
+		errLog.Printf("[convert] %s", err)
 		return nil
 	}
 	// output the relative image path
-	OUTPUT(newPath)
+	emitPath(newPath)
 
 	return nil
 }
 
 var usage = func() {
-	ERRLOG("usage of %s:\n", os.Args[0])
+	fmt.Printf("usage of %s:\n", os.Args[0])
 
 	pwd, _ := os.Getwd()
-	ERRLOG("")
-	ERRLOG("flags:")
-	ERRLOG("\t-res: output image resolution")
-	ERRLOG("\t-output: <destination> directory (default=<res>/%s)", pwd)
-	ERRLOG("\t-type: output image type (default=jpeg)")
-	ERRLOG("")
-	ERRLOG("\t\tavailable image types:")
-	ERRLOG("\t\tjpeg, png")
-	ERRLOG("\t\ttiff: tiff with Deflate compression (alias for tiff-deflate)")
-	ERRLOG("\t\ttiff-none: tiff with no compression")
-
-	ERRLOG("")
-	ERRLOG("writes paths to resulting files to stdout")
-	ERRLOG("reads filepaths from stdin")
-	ERRLOG("will ignore any line from stdin that isnt a filepath (and only a filepath)")
+	fmt.Println("")
+	fmt.Println("flags:")
+	fmt.Println("\t-res: output image resolution")
+	fmt.Printf("\t-output: <destination> directory (default=<res>/%s)", pwd)
+	fmt.Println("\t-type: output image type (default=jpeg)")
+	fmt.Println("")
+	fmt.Println("\t\tavailable image types:")
+	fmt.Println("\t\tjpeg, png")
+	fmt.Println("\t\ttiff: tiff with Deflate compression (alias for tiff-deflate)")
+	fmt.Println("\t\ttiff-none: tiff with no compression")
+	fmt.Println("")
+	fmt.Println("writes paths to resulting files to stdout")
+	fmt.Println("reads filepaths from stdin")
+	fmt.Println("will ignore any line from stdin that isnt a filepath (and only a filepath)")
 }
 
 func stringToPoint(str, sep string) (image.Point, error) {
 	var err error
 	ra := strings.Split(str, sep)
 	point := image.Point{}
-	if point.X, err = strconv.Atoi(ra[0]); err !=nil{
+	if point.X, err = strconv.Atoi(ra[0]); err != nil {
 		return image.Point{}, err
 	}
-	if point.Y, err = strconv.Atoi(ra[1]); err !=nil{
+	if point.Y, err = strconv.Atoi(ra[1]); err != nil {
 		return image.Point{}, err
 	}
 
@@ -160,6 +155,7 @@ func stringToPoint(str, sep string) (image.Point, error) {
 }
 
 func init() {
+	errLog = log.New(os.Stderr, "[tsresize] ", log.Ldate|log.Ltime|log.Lshortfile)
 	flag.Usage = usage
 	// set flags for flag
 	flag.StringVar(&rootDir, "source", "", "source directory")
@@ -188,26 +184,26 @@ func init() {
 		imageEncoder = imgio.JPEGEncoder(95)
 		targetExtension = "jpeg"
 	}
-	if *res == ""{
-		ERRLOG("[flag] no resolution specified")
+	if *res == "" {
+		errLog.Println("[flag] no resolution specified")
 		os.Exit(2)
 	}
 
 	var err error
-	resolution, err = stringToPoint(*res,"x")
-	if err != nil{
-		ERRLOG("[flag] %s", err)
+	resolution, err = stringToPoint(*res, "x")
+	if err != nil {
+		errLog.Printf("[flag] %s", err)
 		panic(err)
 	}
 	if rootDir != "" {
 		if _, err := os.Stat(rootDir); err != nil {
 			if os.IsNotExist(err) {
-				ERRLOG("[path] <source> %s does not exist", rootDir)
+				errLog.Printf("[path] <source> %s does not exist", rootDir)
 				os.Exit(1)
 			}
 		}
 	}
-	if outputDir == ""{
+	if outputDir == "" {
 		outputDir = path.Join(".", *res)
 	}
 	os.MkdirAll(outputDir, 0755)
@@ -216,9 +212,9 @@ func init() {
 }
 
 func main() {
-	if !stdin{
+	if !stdin {
 		if err := filepath.Walk(rootDir, visit); err != nil {
-			ERRLOG("[walk] %s", err)
+			errLog.Printf("[walk] %s", err)
 		}
 		return
 	}
@@ -227,12 +223,12 @@ func main() {
 	for scanner.Scan() {
 		text := strings.Replace(scanner.Text(), "\n", "", -1)
 		if strings.HasPrefix(text, "[") {
-			ERRLOG("[stdin] %s", text)
+			errLog.Printf("[stdin] %s", text)
 			continue
 		} else {
 			finfo, err := os.Stat(text)
 			if err != nil {
-				ERRLOG("[stat] %s", err)
+				errLog.Printf("[stat] %s", err)
 				continue
 			}
 			visit(text, finfo, nil)

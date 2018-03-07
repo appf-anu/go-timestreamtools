@@ -26,6 +26,7 @@ const (
 )
 
 var (
+	errLog             *log.Logger
 	interval           time.Duration
 	rootDir, outputDir string
 	del, stdin         bool
@@ -33,8 +34,6 @@ var (
 )
 
 var /* const */ tsRegex = regexp.MustCompile(tsRegexPattern)
-
-var errLog *log.Logger
 
 func emitPath(a ...interface{}) (n int, err error) {
 	return fmt.Fprintln(os.Stdout, a...)
@@ -92,10 +91,10 @@ func getTimeFromExif(thisFile string) (datetime time.Time, err error) {
 
 		byt, err := ioutil.ReadFile(thisFile + ".json")
 		if err != nil {
-			errLog.Printf("[json] cant read file %s\n", err)
+			errLog.Printf("[json] cant read file %s", err)
 		}
 		if err := json.Unmarshal(byt, &eData); err != nil {
-			errLog.Printf("[json] can't unmarshal %s\n", err)
+			errLog.Printf("[json] can't unmarshal %s", err)
 		}
 
 		datetimeString = eData.DateTime
@@ -124,7 +123,7 @@ func getTimeFromExif(thisFile string) (datetime time.Time, err error) {
 		}
 	}
 	if datetime, err = parseExifDatetime(datetimeString); err != nil {
-		errLog.Printf("[parse] parse datetime %s\n", err)
+		errLog.Printf("[parse] parse datetime %s", err)
 	}
 	return
 }
@@ -178,7 +177,7 @@ func moveOrRename(source, dest string) error {
 		err = moveFilebyCopy(source, dest)
 	}
 	if err != nil {
-		errLog.Printf("[move] %s\n", err)
+		errLog.Printf("[move] %s", err)
 		return nil
 	}
 	return err
@@ -196,7 +195,7 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 	// parse the new filepath
 	newPath, err := alignedFilename(filePath)
 	if err != nil {
-		errLog.Printf("[parse] %s\n", err)
+		errLog.Printf("[parse] %s", err)
 		return nil
 	}
 	newPath = filepath.Join(outputDir, strings.Replace(newPath, rootDir, "", 1))
@@ -204,21 +203,21 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 	fmt.Println(newPath)
 	if _, err := os.Stat(newPath); err == nil {
 		// skip existing.
-		errLog.Printf("[skipped] %s\n", filePath)
+		errLog.Printf("[skipped] %s", filePath)
 		return nil
 	}
 
 	// make directories
 	err = os.MkdirAll(path.Dir(newPath), 0755)
 	if err != nil {
-		errLog.Printf("[mkdir] %s\n", err)
+		errLog.Printf("[mkdir] %s", err)
 		return nil
 	}
 
 	absSrc, _ := filepath.Abs(filePath)
 	absDest, _ := filepath.Abs(newPath)
 	if absSrc == absDest {
-		errLog.Printf("[dupe] %s\n", absDest)
+		errLog.Printf("[dupe] %s", absDest)
 		return nil
 	}
 
@@ -258,7 +257,7 @@ var usage = func() {
 }
 
 func init() {
-	errLog = log.New(os.Stderr, "[ERR] ", log.Ldate|log.Ltime|log.Lshortfile)
+	errLog = log.New(os.Stderr, "[tsalign] ", log.Ldate|log.Ltime|log.Lshortfile)
 	flag.Usage = usage
 	// set flags for flagset
 
