@@ -122,21 +122,21 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 
 var usage = func() {
 	fmt.Printf("usage of %s:\n", os.Args[0])
-
-	pwd, _ := os.Getwd()
-	fmt.Println("")
+	fmt.Println()
 	fmt.Println("flags:")
+  fmt.Println()
 	fmt.Println("\t-res: output image resolution")
-	fmt.Printf("\t-output: <destination> directory (default=<res>/%s)", pwd)
+	fmt.Println("\t-output: <destination> directory (default=.)")
 	fmt.Println("\t-type: output image type (default=jpeg)")
-	fmt.Println("")
+  fmt.Println()
 	fmt.Println("\t\tavailable image types:")
+  fmt.Println()
 	fmt.Println("\t\tjpeg, png")
 	fmt.Println("\t\ttiff: tiff with Deflate compression (alias for tiff-deflate)")
 	fmt.Println("\t\ttiff-none: tiff with no compression")
-	fmt.Println("")
-	fmt.Println("writes paths to resulting files to stdout")
+	fmt.Println()
 	fmt.Println("reads filepaths from stdin")
+  fmt.Println("writes paths to resulting files to stdout")
 	fmt.Println("will ignore any line from stdin that isnt a filepath (and only a filepath)")
 }
 

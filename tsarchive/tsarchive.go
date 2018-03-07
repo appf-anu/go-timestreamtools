@@ -140,17 +140,18 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 
 var usage = func() {
 	fmt.Printf("usage of %s:\n", os.Args[0])
+  fmt.Println()
 	fmt.Println("\tarchive files from directory: ")
 	fmt.Printf("\t\t %s -source <source> -output <output>\n", os.Args[0])
-
-	fmt.Println("")
+	fmt.Println()
 	fmt.Println("flags: ")
-	pwd, _ := os.Getwd()
-	fmt.Printf("\t-output: set the <destination> directory (default=%s)\n", pwd)
-	fmt.Printf("\t-source: set the <source> directory (optional, default=stdin)\n", pwd)
-	fmt.Printf("\t-name: set the name prefix of the output tarfile <name>2006-01-02.tar (default=guess)\n", pwd)
-	fmt.Println("")
+  fmt.Println()
+	fmt.Println("\t-output: set the <destination> directory (default=%s)")
+	fmt.Println("\t-source: set the <source> directory (optional, default=stdin)")
+	fmt.Println("\t-name: set the name prefix of the output tarfile <name>2006-01-02.tar (default=guess)")
+	fmt.Println()
 	fmt.Println("reads filepaths from stdin")
+  fmt.Println("writes paths to resulting files to stdout")
 	fmt.Println("will ignore any line from stdin that isnt a filepath (and only a filepath)")
 }
 
@@ -223,13 +224,4 @@ func main() {
 	for i := range weeklyFileWriter {
 		weeklyFileWriter[i].Close()
 	}
-
-	//c := make(chan error)
-	//go func() {
-	//	c <- filepath.Walk(rootDir, visit)
-	//}()
-	//
-	//if err := <-c; err != nil {
-	//	fmt.Println(err)
-	//}
 }

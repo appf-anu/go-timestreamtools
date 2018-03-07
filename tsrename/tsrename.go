@@ -219,21 +219,22 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 }
 
 var usage = func() {
-	fmt.Printf("usage of %s:", os.Args[0])
+	fmt.Printf("usage of %s:\n", os.Args[0])
+  fmt.Println()
 	fmt.Println("\tcopy with <name> prefix:")
-	fmt.Printf("\t\t %s -source <source> -name=<name>", os.Args[0])
+	fmt.Printf("\t\t %s -source <source> -name=<name>\n", os.Args[0])
 	fmt.Println("\tcopy with <name> prefix:")
-	fmt.Printf("\t\t %s -source <source> -name=<name>", os.Args[0])
-	fmt.Println("")
+	fmt.Printf("\t\t %s -source <source> -name=<name>\n", os.Args[0])
+	fmt.Println()
 	fmt.Println("flags:")
 	fmt.Println("\t-del: removes the source files")
 	fmt.Println("\t-name: renames the prefix fo the target files")
 	fmt.Println("\t-exif: uses exif data to rename rather than file timestamp")
-	pwd, _ := os.Getwd()
-	fmt.Printf("\t-output: set the <destination> directory (default=%s)", pwd)
+	fmt.Println("\t-output: set the <destination> directory (default=.)")
 	fmt.Println("\t-source: set the <source> directory (optional, default=stdin)")
-	fmt.Println("")
+	fmt.Println()
 	fmt.Println("reads filepaths from stdin")
+  fmt.Println("writes paths to resulting files to stdout")
 	fmt.Println("will ignore any line from stdin that isnt a filepath (and only a filepath)")
 
 }

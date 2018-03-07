@@ -142,22 +142,26 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 }
 
 var usage = func() {
-	fmt.Printf("usage of %s:", os.Args[0])
+	fmt.Printf("usage of %s:\n", os.Args[0])
+  fmt.Println()
 	fmt.Println("\tfilter from 11 June 1996 until now with source:")
-	fmt.Printf("\t\t %s -source <source> -start 1996-06-11", os.Args[0])
+	fmt.Printf("\t\t %s -source <source> -start 1996-06-11\n", os.Args[0])
 	fmt.Println("\tfilter from 11 June 1996 to 10 December 1996 from stdin:")
-	fmt.Printf("\t\t %s -start 1996-06-11 -end 1996-12-10", os.Args[0])
-	fmt.Println("")
+
+	fmt.Printf("\t\t %s -start 1996-06-11 -end 1996-12-10\n", os.Args[0])
+	fmt.Println()
 	fmt.Println("flags:")
+  fmt.Println()
 	fmt.Println("\t-start: the start datetime (default=1970-01-01 00:00)")
 	fmt.Println("\t-end: the end datetime (default=now)")
 	fmt.Println("\t-exif: uses exif data to get time instead of the file timestamp")
 	fmt.Println("\t-source: set the <source> directory (optional, default=stdin)")
-	fmt.Println("")
-	fmt.Println("writes paths to resulting files to stdout")
+  fmt.Println()
+  fmt.Println("dates are assumed to be DMY or YMD not MDY")
+  fmt.Println()
 	fmt.Println("reads filepaths from stdin")
+  fmt.Println("writes paths to resulting files to stdout")
 	fmt.Println("will ignore any line from stdin that isnt a filepath (and only a filepath)")
-	fmt.Println("dates are assumed to be DMY or YMD not MDY")
 
 }
 

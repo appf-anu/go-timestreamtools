@@ -200,7 +200,6 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 	}
 	newPath = filepath.Join(outputDir, strings.Replace(newPath, rootDir, "", 1))
 
-	fmt.Println(newPath)
 	if _, err := os.Stat(newPath); err == nil {
 		// skip existing.
 		errLog.Printf("[skipped] %s", filePath)
@@ -234,26 +233,28 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 
 var usage = func() {
 	fmt.Printf("usage of %s:\n", os.Args[0])
+  fmt.Println()
 	fmt.Println("\talign images in place:")
 	fmt.Printf("\t\t%s -source <source> -output <source>\n", os.Args[0])
 	fmt.Println("\t copy aligned to <destination>:")
 	fmt.Printf("\t\t%s -source <source> -output=<destination>\n", os.Args[0])
 
-	fmt.Println("")
+	fmt.Println()
 	fmt.Println("flags:")
+  fmt.Println()
 	fmt.Println("\t-name: renames the prefix fo the target files")
 	fmt.Println("\t-exif: uses exif data to rename rather than file timestamp")
-	pwd, _ := os.Getwd()
-	fmt.Printf("\t-output: set the <destination> directory (default=%s)\n", pwd)
+	fmt.Printf("\t-output: set the <destination> directory (default=<cwd>)")
 	fmt.Println("\t-source: set the <source> directory (optional, default=stdin)")
 	fmt.Println("\t-interval: set the interval to align to (optional, default=5m)")
-	fmt.Println("")
-	fmt.Println("reads filepaths from stdin")
-	fmt.Println("will ignore any line from stdin that isnt a filepath (and only a filepath)")
-	fmt.Println("")
+	fmt.Println()
 	fmt.Println("will only align down, if an image is at 10:03 (5m interval) it will align to 10:00")
 	fmt.Println("chronologically earlier images will be kept")
 	fmt.Println("ie. at 5m interval, an image at 10:03 will overwrite an image at 10:02")
+	fmt.Println()
+	fmt.Println("reads filepaths from stdin")
+  fmt.Println("writes paths to resulting files to stdout")
+	fmt.Println("will ignore any line from stdin that isnt a filepath (and only a filepath)")
 }
 
 func init() {
