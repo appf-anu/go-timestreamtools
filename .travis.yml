@@ -20,7 +20,7 @@ before_script:
   - go get honnef.co/go/tools/cmd/megacheck
 
 script:
-  - golint ./ts* -set_exit_status
+  - golint -set_exit_status ./ts*
   - megacheck ./ts*
   - ./build.sh ./tsalign
   - ./build.sh ./tsarchive
