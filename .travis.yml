@@ -35,6 +35,9 @@ deploy:
     file: "*_win*"
     name: Build $(date +'%Y-%m-%dT%R') - WIN
     skip_cleanup: true
+    on:
+      tags: true
+
 
   - provider: releases
     api_key: $TOKEN
@@ -42,6 +45,9 @@ deploy:
     file: "*_linux*"
     name: Build $(date +'%Y-%m-%dT%R') - LINUX
     skip_cleanup: true
+    on:
+      tags: true
+
 
   - provider: releases
     api_key: $TOKEN
@@ -49,3 +55,5 @@ deploy:
     file: "*_darwin*"
     name: Build $(date +'%Y-%m-%dT%R') - DARWIN
     skip_cleanup: true
+    on:
+      tags: true
