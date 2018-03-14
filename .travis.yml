@@ -17,11 +17,16 @@ before_script:
   - go get github.com/bcampbell/fuzzytime
   - go get github.com/oliamb/cutter
   - go get github.com/golang/lint/golint
+  - go get github.com/stretchr/testify
   - go get honnef.co/go/tools/cmd/megacheck
 
 script:
+  - golint -set_exit_status ./utils
+  - go test ./utils
+  - megacheck ./utils
   - golint -set_exit_status ./ts*
   - megacheck ./ts*
+  - ./build.sh ./tsselect
   - ./build.sh ./tsalign
   - ./build.sh ./tsarchive
   - ./build.sh ./tscrop
@@ -29,6 +34,7 @@ script:
   - ./build.sh ./tsrename
   - ./build.sh ./tsresize
   - ./build.sh ./tsselect
+
 
 before_deploy:
   - tar -zcvf windows.tar.gz *_win*

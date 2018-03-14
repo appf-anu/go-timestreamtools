@@ -2,25 +2,15 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"github.com/bcampbell/fuzzytime"
-	"github.com/rwcarlsen/goexif/exif"
-	"io/ioutil"
+	"github.com/borevitzlab/go-timestreamtools/utils"
 	"log"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
-)
-
-const (
-	tsForm         = "2006_01_02_15_04_05"
-	dumbExifForm   = "2006:01:02 15:04:05"
-	tsRegexPattern = "[0-9][0-9][0-9][0-9]_[0-1][0-9]_[0-3][0-9]_[0-2][0-9]_[0-5][0-9]_[0-5][0-9]"
 )
 
 var (
@@ -30,88 +20,7 @@ var (
 	datetimeFunc datetimeFunction
 )
 
-var /* const */ tsRegex = regexp.MustCompile(tsRegexPattern)
-
-func emitPath(a ...interface{}) (n int, err error) {
-	return fmt.Fprintln(os.Stdout, a...)
-}
-
 type datetimeFunction func(string) (time.Time, error)
-
-func parseExifDatetime(datetimeString string) (time.Time, error) {
-	thisTime, err := time.Parse(dumbExifForm, datetimeString)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return thisTime, nil
-}
-
-type exifFromJSON struct {
-	DateTime          string
-	DateTimeOriginal  string
-	DateTimeDigitized string
-}
-
-func getTimeFromExif(thisFile string) (datetime time.Time, err error) {
-
-	var datetimeString string
-	if _, ferr := os.Stat(thisFile + ".json"); ferr == nil {
-		eData := exifFromJSON{}
-		//	do something with the json.
-
-		byt, err := ioutil.ReadFile(thisFile + ".json")
-		if err != nil {
-			errLog.Printf("[json] cant read file %s", err)
-		}
-		if err := json.Unmarshal(byt, &eData); err != nil {
-			errLog.Printf("[json] can't unmarshal %s", err)
-		}
-
-		datetimeString = eData.DateTime
-
-	} else {
-		fileHandler, err := os.Open(thisFile)
-		if err != nil {
-
-			// file wouldnt open
-			return time.Time{}, err
-		}
-		exifData, err := exif.Decode(fileHandler)
-		if err != nil {
-			// exif wouldnt decode
-			return time.Time{}, fmt.Errorf("[exif] couldn't decode exif from image %s", err)
-		}
-		dt, err := exifData.Get(exif.DateTime) // normally, don't ignore errors!
-		if err != nil {
-			// couldnt get DateTime from exifex
-			return time.Time{}, err
-		}
-		datetimeString, err = dt.StringVal()
-		if err != nil {
-			// couldnt get
-			return time.Time{}, err
-		}
-	}
-	if datetime, err = parseExifDatetime(datetimeString); err != nil {
-		errLog.Printf("[parse] parse datetime %s", err)
-	}
-	return
-}
-
-func getTimeFromFileTimestamp(thisFile string) (time.Time, error) {
-	timestamp := tsRegex.FindString(thisFile)
-	if len(timestamp) < 1 {
-		// no timestamp found in filename
-		return time.Time{}, errors.New("failed regex timestamp from filename")
-	}
-
-	t, err := time.Parse(tsForm, timestamp)
-	if err != nil {
-		// parse error
-		return time.Time{}, err
-	}
-	return t, nil
-}
 
 func inTimeSpan(check time.Time) bool {
 	// from: https://stackoverflow.com/questions/20924303/date-time-comparison-in-golang
@@ -133,7 +42,7 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 	}
 
 	if ok, err := checkFilePath(filePath); ok {
-		emitPath(filePath)
+		utils.EmitPath(filePath)
 	} else if err != nil {
 		errLog.Printf("[check] %s", err)
 	}
@@ -143,7 +52,7 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 
 var usage = func() {
 	fmt.Printf("usage of %s:\n", os.Args[0])
-  fmt.Println()
+	fmt.Println()
 	fmt.Println("\tfilter from 11 June 1996 until now with source:")
 	fmt.Printf("\t\t %s -source <source> -start 1996-06-11\n", os.Args[0])
 	fmt.Println("\tfilter from 11 June 1996 to 10 December 1996 from stdin:")
@@ -151,16 +60,16 @@ var usage = func() {
 	fmt.Printf("\t\t %s -start 1996-06-11 -end 1996-12-10\n", os.Args[0])
 	fmt.Println()
 	fmt.Println("flags:")
-  fmt.Println()
+	fmt.Println()
 	fmt.Println("\t-start: the start datetime (default=1970-01-01 00:00)")
 	fmt.Println("\t-end: the end datetime (default=now)")
 	fmt.Println("\t-exif: uses exif data to get time instead of the file timestamp")
 	fmt.Println("\t-source: set the <source> directory (optional, default=stdin)")
-  fmt.Println()
-  fmt.Println("dates are assumed to be DMY or YMD not MDY")
-  fmt.Println()
+	fmt.Println()
+	fmt.Println("dates are assumed to be DMY or YMD not MDY")
+	fmt.Println()
 	fmt.Println("reads filepaths from stdin")
-  fmt.Println("writes paths to resulting files to stdout")
+	fmt.Println("writes paths to resulting files to stdout")
 	fmt.Println("will ignore any line from stdin that isnt a filepath (and only a filepath)")
 
 }
@@ -178,9 +87,9 @@ func init() {
 	flag.Parse()
 
 	if *useExif {
-		datetimeFunc = getTimeFromExif
+		datetimeFunc = utils.GetTimeFromExif
 	} else {
-		datetimeFunc = getTimeFromFileTimestamp
+		datetimeFunc = utils.GetTimeFromFileTimestamp
 	}
 
 	ctx := fuzzytime.Context{
@@ -253,13 +162,4 @@ func main() {
 			}
 		}
 	}
-
-	//c := make(chan error)
-	//go func() {
-	//	c <- filepath.Walk(rootDir, visit)
-	//}()
-	//
-	//if err := <-c; err != nil {
-	//	fmt.Println(err)
-	//}
 }

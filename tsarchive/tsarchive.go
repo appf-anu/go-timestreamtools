@@ -3,30 +3,17 @@ package main
 import (
 	"archive/tar"
 	"bufio"
-	"errors"
 	"flag"
 	"fmt"
+	"github.com/borevitzlab/go-timestreamtools/utils"
 	"io"
 	"log"
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 )
-
-func emitPath(a ...interface{}) (n int, err error) {
-	return fmt.Fprintln(os.Stdout, a...)
-}
-
-const (
-	archiveForm    = "%s2006-01-02.tar"
-	tsForm         = "2006_01_02_15_04_05"
-	tsRegexPattern = "[0-9][0-9][0-9][0-9]_[0-1][0-9]_[0-3][0-9]_[0-2][0-9]_[0-5][0-9]_[0-5][0-9]"
-)
-
-var /* const */ tsRegex = regexp.MustCompile(tsRegexPattern)
 
 var (
 	errLog                          *log.Logger
@@ -60,31 +47,16 @@ func addFile(tw *tar.Writer, thePath string) error {
 	return nil
 }
 
-func getTimeFromFileTimestamp(thisFile string) (time.Time, error) {
-	timestamp := tsRegex.FindString(thisFile)
-	if len(timestamp) < 1 {
-		// no timestamp found in filename
-		return time.Time{}, errors.New("failed regex timestamp from filename")
-	}
-
-	t, err := time.Parse(tsForm, timestamp)
-	if err != nil {
-		// parse error
-		return time.Time{}, err
-	}
-	return t, nil
-}
-
 func getNameFromFilepath(thisFile string, sunday time.Time) string {
 	name := archiveName
 	if archiveName != "" {
-		timestamp := tsRegex.FindString(thisFile)
+		timestamp := utils.TsRegex.FindString(thisFile)
 		baseFile := path.Base(thisFile)
 		ext := path.Ext(baseFile)
 		filename := strings.TrimSuffix(baseFile, ext)
 		name = strings.Replace(filename, timestamp, "", 1)
 	}
-	datedArchive := sunday.Format(archiveForm)
+	datedArchive := sunday.Format(utils.ArchiveForm)
 	return fmt.Sprintf(datedArchive, name)
 }
 
@@ -105,7 +77,7 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 		return nil
 	}
 
-	t, err := getTimeFromFileTimestamp(filePath)
+	t, err := utils.GetTimeFromFileTimestamp(filePath)
 	if err != nil {
 		errLog.Printf("%s", err)
 		return nil
@@ -131,27 +103,27 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 	}
 
 	if absPath, err := filepath.Abs(filePath); err == nil {
-		emitPath(absPath)
+		utils.EmitPath(absPath)
 	} else {
-		emitPath(filePath)
+		utils.EmitPath(filePath)
 	}
 	return nil
 }
 
 var usage = func() {
 	fmt.Printf("usage of %s:\n", os.Args[0])
-  fmt.Println()
+	fmt.Println()
 	fmt.Println("\tarchive files from directory: ")
 	fmt.Printf("\t\t %s -source <source> -output <output>\n", os.Args[0])
 	fmt.Println()
 	fmt.Println("flags: ")
-  fmt.Println()
-	fmt.Println("\t-output: set the <destination> directory (default=%s)")
+	fmt.Println()
+	fmt.Println("\t-output: set the <destination> directory (default=.)")
 	fmt.Println("\t-source: set the <source> directory (optional, default=stdin)")
 	fmt.Println("\t-name: set the name prefix of the output tarfile <name>2006-01-02.tar (default=guess)")
 	fmt.Println()
 	fmt.Println("reads filepaths from stdin")
-  fmt.Println("writes paths to resulting files to stdout")
+	fmt.Println("writes paths to resulting files to stdout")
 	fmt.Println("will ignore any line from stdin that isnt a filepath (and only a filepath)")
 }
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/anthonynsimon/bild/imgio"
 	"github.com/anthonynsimon/bild/transform"
+	"github.com/borevitzlab/go-timestreamtools/utils"
 	"github.com/rwcarlsen/goexif/exif"
 	"golang.org/x/image/tiff"
 	"image"
@@ -27,10 +28,6 @@ var (
 	stdin                               bool
 	imageEncoder                        imgio.Encoder
 )
-
-func emitPath(a ...interface{}) (n int, err error) {
-	return fmt.Fprintln(os.Stdout, a...)
-}
 
 // TIFFEncoder returns an encoder to the Tagged Image Format
 func TIFFEncoder(compressionType tiff.CompressionType) imgio.Encoder {
@@ -115,7 +112,7 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 		return nil
 	}
 	// output the relative image path
-	emitPath(newPath)
+	utils.EmitPath(newPath)
 
 	return nil
 }
@@ -124,19 +121,19 @@ var usage = func() {
 	fmt.Printf("usage of %s:\n", os.Args[0])
 	fmt.Println()
 	fmt.Println("flags:")
-  fmt.Println()
+	fmt.Println()
 	fmt.Println("\t-res: output image resolution")
 	fmt.Println("\t-output: <destination> directory (default=.)")
 	fmt.Println("\t-type: output image type (default=jpeg)")
-  fmt.Println()
+	fmt.Println()
 	fmt.Println("\t\tavailable image types:")
-  fmt.Println()
+	fmt.Println()
 	fmt.Println("\t\tjpeg, png")
 	fmt.Println("\t\ttiff: tiff with Deflate compression (alias for tiff-deflate)")
 	fmt.Println("\t\ttiff-none: tiff with no compression")
 	fmt.Println()
 	fmt.Println("reads filepaths from stdin")
-  fmt.Println("writes paths to resulting files to stdout")
+	fmt.Println("writes paths to resulting files to stdout")
 	fmt.Println("will ignore any line from stdin that isnt a filepath (and only a filepath)")
 }
 
@@ -234,12 +231,4 @@ func main() {
 			visit(text, finfo, nil)
 		}
 	}
-	//c := make(chan error)
-	//go func() {
-	//	c <- filepath.Walk(rootDir, visit)
-	//}()
-	//
-	//if err := <-c; err != nil {
-	//	fmt.Println(err)
-	//}
 }

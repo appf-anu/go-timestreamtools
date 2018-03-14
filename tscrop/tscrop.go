@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/anthonynsimon/bild/imgio"
+	"github.com/borevitzlab/go-timestreamtools/utils"
 	"github.com/oliamb/cutter"
 	"github.com/rwcarlsen/goexif/exif"
 	"golang.org/x/image/tiff"
@@ -28,10 +29,6 @@ var (
 	stdin, center                       bool
 	imageEncoder                        imgio.Encoder
 )
-
-func emitPath(a ...interface{}) (n int, err error) {
-	return fmt.Fprintln(os.Stdout, a...)
-}
 
 // TIFFEncoder returns an encoder to the Tagged Image Format
 func TIFFEncoder(compressionType tiff.CompressionType) imgio.Encoder {
@@ -134,7 +131,7 @@ func cropImage(sourcePath, destPath string) (err error) {
 					return
 				}
 				// output the relative image path
-				emitPath(destPath)
+				utils.EmitPath(destPath)
 			}(xPos, yPos)
 		}
 	}
@@ -173,7 +170,7 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 
 var usage = func() {
 	fmt.Printf("usage of %s:\n", os.Args[0])
-  fmt.Println()
+	fmt.Println()
 	fmt.Println("centered crop to 1920x1080")
 	fmt.Printf("\t%s -center -c1 1920,1080\n", os.Args[0])
 	fmt.Println("cut out 120,10 to 400,60")
@@ -196,7 +193,7 @@ var usage = func() {
 	fmt.Println("\t-output: set the <destination> directory (default=<cwd>/<crop>)")
 	fmt.Println()
 	fmt.Println("reads filepaths from stdin")
-  fmt.Println("writes paths to resulting files to stdout")
+	fmt.Println("writes paths to resulting files to stdout")
 	fmt.Println("will ignore any line from stdin that isnt a filepath (and only a filepath)")
 }
 

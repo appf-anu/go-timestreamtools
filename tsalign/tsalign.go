@@ -2,27 +2,15 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
-	"github.com/rwcarlsen/goexif/exif"
-	"io"
-	"io/ioutil"
+	"github.com/borevitzlab/go-timestreamtools/utils"
 	"log"
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
-)
-
-const (
-	tsForm         = "2006_01_02_15_04_05"
-	dumbExifForm   = "2006:01:02 15:04:05"
-	tsDirStruct    = "2006/2006_01/2006_01_02/2006_01_02_15/"
-	tsRegexPattern = "[0-9][0-9][0-9][0-9]_[0-1][0-9]_[0-3][0-9]_[0-2][0-9]_[0-5][0-9]_[0-5][0-9]"
 )
 
 var (
@@ -33,115 +21,7 @@ var (
 	datetimeFunc       datetimeFunction
 )
 
-var /* const */ tsRegex = regexp.MustCompile(tsRegexPattern)
-
-func emitPath(a ...interface{}) (n int, err error) {
-	return fmt.Fprintln(os.Stdout, a...)
-}
-
-func moveFilebyCopy(src, dst string) error {
-	s, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	// no need to check errors on read only file, we already got everything
-	// we need from the filesystem, so nothing can go wrong now.
-	defer s.Close()
-
-	d, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	if _, err := io.Copy(d, s); err != nil {
-		d.Close()
-		return err
-	}
-	if del {
-		absSrc, _ := filepath.Abs(src)
-		absDest, _ := filepath.Abs(dst)
-		if absSrc != absDest {
-			os.Remove(src)
-		}
-	}
-	return d.Close()
-}
-
 type datetimeFunction func(string) (time.Time, error)
-
-func parseExifDatetime(datetimeString string) (time.Time, error) {
-	thisTime, err := time.Parse(dumbExifForm, datetimeString)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return thisTime, nil
-}
-
-type exifFromJSON struct {
-	DateTime          string
-	DateTimeOriginal  string
-	DateTimeDigitized string
-}
-
-func getTimeFromExif(thisFile string) (datetime time.Time, err error) {
-
-	var datetimeString string
-	if _, ferr := os.Stat(thisFile + ".json"); ferr == nil {
-		eData := exifFromJSON{}
-		//	do something with the json.
-
-		byt, err := ioutil.ReadFile(thisFile + ".json")
-		if err != nil {
-			errLog.Printf("[json] cant read file %s", err)
-		}
-		if err := json.Unmarshal(byt, &eData); err != nil {
-			errLog.Printf("[json] can't unmarshal %s", err)
-		}
-
-		datetimeString = eData.DateTime
-
-	} else {
-		fileHandler, err := os.Open(thisFile)
-		if err != nil {
-
-			// file wouldnt open
-			return time.Time{}, err
-		}
-		exifData, err := exif.Decode(fileHandler)
-		if err != nil {
-			// exif wouldnt decode
-			return time.Time{}, fmt.Errorf("[exif] couldn't decode exif from image %s", err)
-		}
-		dt, err := exifData.Get(exif.DateTime) // normally, don't ignore errors!
-		if err != nil {
-			// couldnt get DateTime from exifex
-			return time.Time{}, err
-		}
-		datetimeString, err = dt.StringVal()
-		if err != nil {
-			// couldnt get
-			return time.Time{}, err
-		}
-	}
-	if datetime, err = parseExifDatetime(datetimeString); err != nil {
-		errLog.Printf("[parse] parse datetime %s", err)
-	}
-	return
-}
-
-func getTimeFromFileTimestamp(thisFile string) (time.Time, error) {
-	timestamp := tsRegex.FindString(thisFile)
-	if len(timestamp) < 1 {
-		// no timestamp found in filename
-		return time.Time{}, errors.New("[path] failed regex timestamp from filename")
-	}
-
-	t, err := time.Parse(tsForm, timestamp)
-	if err != nil {
-		// parse error
-		return time.Time{}, err
-	}
-	return t, nil
-}
 
 func alignedFilename(thisFile string) (string, error) {
 	thisTime, err := datetimeFunc(thisFile)
@@ -155,9 +35,9 @@ func alignedFilename(thisFile string) (string, error) {
 		return "", err
 	}
 
-	targetFilename := strings.Replace(thisFile, thisTime.Format(tsForm), aligned.Format(tsForm), 1)
+	targetFilename := strings.Replace(thisFile, thisTime.Format(utils.TsForm), aligned.Format(utils.TsForm), 1)
 	// make sure that if its already formatted as a timestream that we reformat the timestream structure.
-	targetFilename = strings.Replace(targetFilename, thisTime.Format(tsDirStruct), aligned.Format(tsDirStruct), 1)
+	targetFilename = strings.Replace(targetFilename, thisTime.Format(utils.DefaultTsDirectoryStructure), aligned.Format(utils.DefaultTsDirectoryStructure), 1)
 	if del {
 		return targetFilename, nil
 	}
@@ -171,10 +51,10 @@ func moveOrRename(source, dest string) error {
 	if del {
 		err = os.Rename(source, dest)
 		if err != nil {
-			err = moveFilebyCopy(source, dest)
+			err = utils.MoveFilebyCopy(source, dest, del)
 		}
 	} else {
-		err = moveFilebyCopy(source, dest)
+		err = utils.MoveFilebyCopy(source, dest, del)
 	}
 	if err != nil {
 		errLog.Printf("[move] %s", err)
@@ -227,13 +107,13 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 			errLog.Println("[exif] couldn't move json exif file")
 		}
 	}
-	emitPath(newPath)
+	utils.EmitPath(newPath)
 	return err
 }
 
 var usage = func() {
 	fmt.Printf("usage of %s:\n", os.Args[0])
-  fmt.Println()
+	fmt.Println()
 	fmt.Println("\talign images in place:")
 	fmt.Printf("\t\t%s -source <source> -output <source>\n", os.Args[0])
 	fmt.Println("\t copy aligned to <destination>:")
@@ -241,7 +121,7 @@ var usage = func() {
 
 	fmt.Println()
 	fmt.Println("flags:")
-  fmt.Println()
+	fmt.Println()
 	fmt.Println("\t-name: renames the prefix fo the target files")
 	fmt.Println("\t-exif: uses exif data to rename rather than file timestamp")
 	fmt.Printf("\t-output: set the <destination> directory (default=<cwd>)")
@@ -253,7 +133,7 @@ var usage = func() {
 	fmt.Println("ie. at 5m interval, an image at 10:03 will overwrite an image at 10:02")
 	fmt.Println()
 	fmt.Println("reads filepaths from stdin")
-  fmt.Println("writes paths to resulting files to stdout")
+	fmt.Println("writes paths to resulting files to stdout")
 	fmt.Println("will ignore any line from stdin that isnt a filepath (and only a filepath)")
 }
 
@@ -271,9 +151,9 @@ func init() {
 	flag.Parse()
 
 	if *useExif {
-		datetimeFunc = getTimeFromExif
+		datetimeFunc = utils.GetTimeFromExif
 	} else {
-		datetimeFunc = getTimeFromFileTimestamp
+		datetimeFunc = utils.GetTimeFromFileTimestamp
 	}
 
 	if rootDir != "" {
