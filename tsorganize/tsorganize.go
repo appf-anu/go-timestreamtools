@@ -59,7 +59,12 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 	if info.IsDir() {
 		return nil
 	}
+
 	if path.Ext(filePath) == ".json" {
+		return nil
+	}
+
+	if strings.HasPrefix(filepath.Base(filePath), "."){
 		return nil
 	}
 

@@ -69,6 +69,7 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 	if info.IsDir() {
 		return nil
 	}
+
 	ext := path.Ext(filePath)
 	switch extlower := strings.ToLower(ext); extlower {
 	case ".jpeg", ".jpg", ".tif", ".tiff", ".cr2":

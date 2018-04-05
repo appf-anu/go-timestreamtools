@@ -27,6 +27,7 @@ var (
 	resolution                          image.Point
 	stdin                               bool
 	imageEncoder                        imgio.Encoder
+	outputJSON                              bool
 )
 
 // TIFFEncoder returns an encoder to the Tagged Image Format
@@ -71,7 +72,9 @@ func writeExifJSON(sourcePath, destPath string) {
 }
 
 func convertImage(sourcePath, destPath string) (err error) {
-	writeExifJSON(sourcePath, destPath)
+	if outputJSON{
+		writeExifJSON(sourcePath, destPath)
+	}
 
 	img, err := imgio.Open(sourcePath)
 	if err != nil {
@@ -124,11 +127,12 @@ var usage = func() {
 	fmt.Println()
 	fmt.Println("\t-res: output image resolution")
 	fmt.Println("\t-output: <destination> directory (default=.)")
-	fmt.Println("\t-type: output image type (default=jpeg)")
+	fmt.Println("\t-type: output image type (default=jpg)")
+	fmt.Println("\t-json: output image exif json")
 	fmt.Println()
 	fmt.Println("\t\tavailable image types:")
 	fmt.Println()
-	fmt.Println("\t\tjpeg, png")
+	fmt.Println("\t\tjpg, png")
 	fmt.Println("\t\ttiff: tiff with Deflate compression (alias for tiff-deflate)")
 	fmt.Println("\t\ttiff-none: tiff with no compression")
 	fmt.Println()
@@ -157,14 +161,16 @@ func init() {
 	// set flags for flag
 	flag.StringVar(&rootDir, "source", "", "source directory")
 	flag.StringVar(&outputDir, "output", "", "output directory")
-	outputType := flag.String("type", "jpeg", "output image type")
+
+	flag.BoolVar(&outputJSON, "json", false, "output json")
+	outputType := flag.String("type", "jpg", "output image type")
 	res := flag.String("res", "", "resolution")
 	flag.Parse()
 
 	switch *outputType {
-	case "jpeg":
+	case "jpg":
 		imageEncoder = imgio.JPEGEncoder(95)
-		targetExtension = "jpeg"
+		targetExtension = "jpg"
 	case "tiff":
 		imageEncoder = TIFFEncoder(tiff.Deflate)
 		targetExtension = "tif"
@@ -179,7 +185,7 @@ func init() {
 		targetExtension = "png"
 	default:
 		imageEncoder = imgio.JPEGEncoder(95)
-		targetExtension = "jpeg"
+		targetExtension = "jpg"
 	}
 	if *res == "" {
 		errLog.Println("[flag] no resolution specified")
@@ -200,7 +206,7 @@ func init() {
 			}
 		}
 	}
-	if outputDir == "" {
+	if outputDir == "" && rootDir != "" {
 		outputDir = path.Join(".", *res)
 	}
 	os.MkdirAll(outputDir, 0755)

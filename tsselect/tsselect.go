@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"path"
 )
 
 var (
@@ -38,6 +39,13 @@ func checkFilePath(thisFile string) (bool, error) {
 func visit(filePath string, info os.FileInfo, _ error) error {
 	// skip directories
 	if info.IsDir() {
+		return nil
+	}
+	if path.Ext(filePath) == ".json" {
+		return nil
+	}
+
+	if strings.HasPrefix(filepath.Base(filePath), "."){
 		return nil
 	}
 

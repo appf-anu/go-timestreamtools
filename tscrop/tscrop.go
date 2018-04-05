@@ -142,9 +142,19 @@ func cropImage(sourcePath, destPath string) (err error) {
 
 func visit(filePath string, info os.FileInfo, _ error) error {
 	// skip directories
+	// skip directories
 	if info.IsDir() {
 		return nil
 	}
+
+	if path.Ext(filePath) == ".json" {
+		return nil
+	}
+
+	if strings.HasPrefix(filepath.Base(filePath), "."){
+		return nil
+	}
+
 	ext := path.Ext(filePath)
 	switch extlower := strings.ToLower(ext); extlower {
 	case ".jpeg", ".jpg", ".tif", ".tiff", ".cr2":

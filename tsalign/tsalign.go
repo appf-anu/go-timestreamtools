@@ -72,13 +72,19 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 		return nil
 	}
 
+	if strings.HasPrefix(filepath.Base(filePath), "."){
+		return nil
+	}
+
 	// parse the new filepath
 	newPath, err := alignedFilename(filePath)
 	if err != nil {
 		errLog.Printf("[parse] %s", err)
 		return nil
 	}
-	newPath = filepath.Join(outputDir, strings.Replace(newPath, rootDir, "", 1))
+	replaced1 := strings.Replace(newPath, rootDir, "", 1)
+	replaced2 := strings.Replace(replaced1, outputDir, "", 1)
+	newPath = filepath.Join(outputDir, replaced2)
 
 	if _, err := os.Stat(newPath); err == nil {
 		// skip existing.

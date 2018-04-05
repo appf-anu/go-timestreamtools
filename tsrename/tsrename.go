@@ -31,7 +31,13 @@ func parseFilename(thisFile string) (string, error) {
 	formattedSubdirs := path.Dir(thisFile)
 
 	ext := path.Ext(thisFile)
-	targetFilename := namedOutput + "_" + thisTime.Format(utils.TsForm) + ext
+	if ext == ".jpeg"{
+		ext = ".jpg"
+	}
+	if ext == ".tiff"{
+		ext = ".tif"
+	}
+	targetFilename := namedOutput + "_" + thisTime.Format(utils.TsForm)+"_00" + ext
 
 	newT := path.Join(outputDir, formattedSubdirs, targetFilename)
 
@@ -58,10 +64,15 @@ func moveOrRename(source, dest string) error {
 
 func visit(filePath string, info os.FileInfo, _ error) error {
 	// skip directories
+	// skip directories
 	if info.IsDir() {
 		return nil
 	}
 	if path.Ext(filePath) == ".json" {
+		return nil
+	}
+
+	if strings.HasPrefix(filepath.Base(filePath), "."){
 		return nil
 	}
 
