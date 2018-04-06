@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/borevitzlab/go-timestreamtools/utils"
+	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -16,8 +17,9 @@ import (
 var (
 	errLog                          *log.Logger
 	rootDir, outputDir, tsDirStruct string
-	del                             bool
-	datetimeFunc                    datetimeFunction
+	del, noClean                    bool
+
+	datetimeFunc datetimeFunction
 )
 
 type datetimeFunction func(string) (time.Time, error)
@@ -64,7 +66,7 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 		return nil
 	}
 
-	if strings.HasPrefix(filepath.Base(filePath), "."){
+	if strings.HasPrefix(filepath.Base(filePath), ".") {
 		return nil
 	}
 
@@ -75,13 +77,6 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 		return nil
 	}
 
-	// make directories
-	err = os.MkdirAll(path.Dir(newPath), 0755)
-	if err != nil {
-		errLog.Printf("[mkdir] %s", err)
-		return nil
-	}
-
 	absSrc, _ := filepath.Abs(filePath)
 	absDest, _ := filepath.Abs(newPath)
 	if absSrc == absDest {
@@ -89,7 +84,18 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 		return nil
 	}
 
-	err = moveOrRename(filePath, absDest)
+	// make directories
+	err = os.MkdirAll(path.Dir(newPath), 0755)
+	if err != nil {
+		errLog.Printf("[mkdir] %s", err)
+		return nil
+	}
+
+	if err := moveOrRename(filePath, absDest); err != nil{
+		errLog.Printf("[move] %s", err)
+		return nil
+	}
+
 	jsFile := filePath + ".json"
 	if _, ferr := os.Stat(jsFile); ferr == nil {
 		if e := moveOrRename(jsFile, absDest+".json"); e != nil {
@@ -118,8 +124,9 @@ var usage = func() {
 	fmt.Println("\t-del: removes the source files")
 	fmt.Println("\t-dirstruct: directory structure to pass to golangs time.Format")
 	fmt.Println("\t-exif: uses exif data to rename rather than file timestamp")
-	fmt.Println("\t-output: set the <destination> directory (default=.)")
+	fmt.Println("\t-output: set the <destination> directory (default=tempdir)")
 	fmt.Println("\t-source: set the <source> directory (optional, default=stdin)")
+	fmt.Println("\t-no-clean: dont clean up temps (default=false)")
 	fmt.Println()
 	fmt.Println("reads filepaths from stdin")
 	fmt.Println("writes paths to resulting files to stdout")
@@ -132,8 +139,9 @@ func init() {
 	flag.Usage = usage
 	// set flags for flagset
 	flag.StringVar(&rootDir, "source", "", "source directory")
-	flag.StringVar(&outputDir, "output", ".", "output directory")
+	flag.StringVar(&outputDir, "output", "", "output directory")
 	flag.StringVar(&tsDirStruct, "dirstruct", utils.DefaultTsDirectoryStructure, "output directory structure")
+	flag.BoolVar(&noClean, "no-clean", false, "dont cleanup default=false")
 	flag.BoolVar(&del, "del", false, "delete source files")
 
 	useExif := flag.Bool("exif", false, "use exif instead of timestamps in filenames")
@@ -145,7 +153,7 @@ func init() {
 	} else {
 		datetimeFunc = utils.GetTimeFromFileTimestamp
 	}
-	// create dirs
+
 	if rootDir != "" {
 		if _, err := os.Stat(rootDir); err != nil {
 			if os.IsNotExist(err) {
@@ -154,12 +162,25 @@ func init() {
 			}
 		}
 	}
-
-	// more create dirs
-	os.MkdirAll(outputDir, 0755)
 }
 
 func main() {
+
+	if outputDir == "" {
+		tmpDir, err := ioutil.TempDir("", "tsorganise")
+		if err != nil {
+			panic(err)
+		}
+		outputDir = tmpDir
+		if !noClean {
+			defer os.RemoveAll(tmpDir)
+		} else {
+			// pass delete dir onto next step
+			defer utils.EmitPath("#-" + tmpDir)
+		}
+	}
+	// more create dirs
+	os.MkdirAll(outputDir, 0755)
 
 	if rootDir != "" {
 		if err := filepath.Walk(rootDir, visit); err != nil {
@@ -169,11 +190,13 @@ func main() {
 		// start scanner and wait for stdin
 		scanner := bufio.NewScanner(os.Stdin)
 		for scanner.Scan() {
-
 			text := strings.Replace(scanner.Text(), "\n", "", -1)
 			if strings.HasPrefix(text, "[") {
 				errLog.Printf("[stdin] %s", text)
 				continue
+			} else if strings.HasPrefix(text, "#-") {
+				// was signalled deletion of previous tmpdir, wait until finished
+				defer os.RemoveAll(strings.TrimPrefix(text, "#-"))
 			} else {
 				finfo, err := os.Stat(text)
 				if err != nil {

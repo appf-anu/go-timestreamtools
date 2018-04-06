@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/borevitzlab/go-timestreamtools/utils"
+	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -28,18 +29,16 @@ func parseFilename(thisFile string) (string, error) {
 		return "", err
 	}
 
-	formattedSubdirs := path.Dir(thisFile)
-
 	ext := path.Ext(thisFile)
-	if ext == ".jpeg"{
+	if ext == ".jpeg" {
 		ext = ".jpg"
 	}
-	if ext == ".tiff"{
+	if ext == ".tiff" {
 		ext = ".tif"
 	}
-	targetFilename := namedOutput + "_" + thisTime.Format(utils.TsForm)+"_00" + ext
+	targetFilename := namedOutput + "_" + thisTime.Format(utils.TsForm) + "_00" + ext
 
-	newT := path.Join(outputDir, formattedSubdirs, targetFilename)
+	newT := path.Join(outputDir, targetFilename)
 
 	return newT, nil
 }
@@ -72,7 +71,7 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 		return nil
 	}
 
-	if strings.HasPrefix(filepath.Base(filePath), "."){
+	if strings.HasPrefix(filepath.Base(filePath), ".") {
 		return nil
 	}
 
@@ -97,7 +96,11 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 		return nil
 	}
 
-	err = moveOrRename(filePath, absDest)
+	if err := moveOrRename(filePath, absDest); err != nil{
+		errLog.Printf("[move] %s", err)
+		return nil
+	}
+
 	jsFile := filePath + ".json"
 	if _, ferr := os.Stat(jsFile); ferr == nil {
 		if e := moveOrRename(jsFile, absDest+".json"); e != nil {
@@ -122,13 +125,12 @@ var usage = func() {
 	fmt.Println("\t-del: removes the source files")
 	fmt.Println("\t-name: renames the prefix fo the target files")
 	fmt.Println("\t-exif: uses exif data to rename rather than file timestamp")
-	fmt.Println("\t-output: set the <destination> directory (default=.)")
+	fmt.Println("\t-output: set the <destination> directory (default=tmpdir)")
 	fmt.Println("\t-source: set the <source> directory (optional, default=stdin)")
 	fmt.Println()
 	fmt.Println("reads filepaths from stdin")
 	fmt.Println("writes paths to resulting files to stdout")
 	fmt.Println("will ignore any line from stdin that isnt a filepath (and only a filepath)")
-
 }
 
 func init() {
@@ -137,7 +139,7 @@ func init() {
 	// set flags for flagset
 	flag.StringVar(&namedOutput, "name", "", "name for the stream")
 	flag.StringVar(&rootDir, "source", "", "source directory")
-	flag.StringVar(&outputDir, "output", ".", "output directory")
+	flag.StringVar(&outputDir, "output", "", "output directory")
 	flag.BoolVar(&del, "del", false, "delete source files")
 
 	useExif := flag.Bool("exif", false, "use exif instead of timestamps in filenames")
@@ -158,13 +160,21 @@ func init() {
 			}
 		}
 	}
-
-	// more create dirs
-	//outputDir, _ = filepath.Abs(outputDir)
-	os.MkdirAll(outputDir, 0755)
 }
 
 func main() {
+
+	if outputDir == "" {
+		tmpDir, err := ioutil.TempDir("", "tsrename-")
+		if err != nil {
+			panic(err)
+		}
+		// pass delete dir onto next step once finished
+		defer utils.EmitPath("#-" + tmpDir)
+		outputDir = tmpDir
+	}
+	// more create dirs
+	os.MkdirAll(outputDir, 0755)
 
 	if rootDir != "" {
 		if err := filepath.Walk(rootDir, visit); err != nil {
@@ -174,11 +184,13 @@ func main() {
 		// start scanner and wait for stdin
 		scanner := bufio.NewScanner(os.Stdin)
 		for scanner.Scan() {
-
 			text := strings.Replace(scanner.Text(), "\n", "", -1)
 			if strings.HasPrefix(text, "[") {
 				errLog.Printf("[stdin] %s", text)
 				continue
+			} else if strings.HasPrefix(text, "#-") {
+				// was signalled deletion of previous tmpdir, wait until finished
+				defer os.RemoveAll(strings.TrimPrefix(text, "#-"))
 			} else {
 				finfo, err := os.Stat(text)
 				if err != nil {

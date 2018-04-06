@@ -8,10 +8,10 @@ import (
 	"github.com/borevitzlab/go-timestreamtools/utils"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
-	"path"
 )
 
 var (
@@ -45,7 +45,7 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 		return nil
 	}
 
-	if strings.HasPrefix(filepath.Base(filePath), "."){
+	if strings.HasPrefix(filepath.Base(filePath), ".") {
 		return nil
 	}
 
@@ -77,9 +77,9 @@ var usage = func() {
 	fmt.Println("dates are assumed to be DMY or YMD not MDY")
 	fmt.Println()
 	fmt.Println("reads filepaths from stdin")
-	fmt.Println("writes paths to resulting files to stdout")
+	fmt.Println("writes paths to selected files to stdout")
 	fmt.Println("will ignore any line from stdin that isnt a filepath (and only a filepath)")
-
+	fmt.Println("tsselect is NON DESTRUCTIVE, and doesnt copy/move files, it only filters")
 }
 
 func init() {
@@ -100,9 +100,10 @@ func init() {
 		datetimeFunc = utils.GetTimeFromFileTimestamp
 	}
 
+
 	ctx := fuzzytime.Context{
-		fuzzytime.DMYResolver,
-		fuzzytime.DefaultTZResolver("UTC"),
+		DateResolver: fuzzytime.DMYResolver,
+		TZResolver:   fuzzytime.DefaultTZResolver("UTC"),
 	}
 	startDatetime, _, err := ctx.Extract(*startString)
 	if err != nil {
@@ -116,6 +117,7 @@ func init() {
 		startDatetime.Time.SetMinute(startDatetime.Time.Minute())
 		startDatetime.Time.SetSecond(startDatetime.Time.Second())
 		startDatetime.Time.SetTZOffset(startDatetime.Time.TZOffset())
+
 		start, _ = time.Parse(time.RFC3339, startDatetime.ISOFormat())
 	}
 	endDatetime, _, err := ctx.Extract(*endString)
@@ -124,7 +126,8 @@ func init() {
 	}
 
 	if endDatetime.Empty() {
-		end = time.Now()
+		end, _ = time.Parse(utils.TsForm, time.Now().Format(utils.TsForm))
+
 	} else {
 		endDatetime.Time.SetHour(endDatetime.Time.Hour())
 		endDatetime.Time.SetMinute(endDatetime.Time.Minute())
@@ -146,7 +149,6 @@ func init() {
 }
 
 func main() {
-
 	if rootDir != "" {
 		if err := filepath.Walk(rootDir, visit); err != nil {
 			errLog.Printf("[walk] %s", err)

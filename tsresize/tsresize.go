@@ -25,9 +25,9 @@ var (
 	errLog                              *log.Logger
 	rootDir, outputDir, targetExtension string
 	resolution                          image.Point
-	stdin                               bool
+	res                                 string
 	imageEncoder                        imgio.Encoder
-	outputJSON                              bool
+	outputJSON                          bool
 )
 
 // TIFFEncoder returns an encoder to the Tagged Image Format
@@ -72,7 +72,7 @@ func writeExifJSON(sourcePath, destPath string) {
 }
 
 func convertImage(sourcePath, destPath string) (err error) {
-	if outputJSON{
+	if outputJSON {
 		writeExifJSON(sourcePath, destPath)
 	}
 
@@ -164,7 +164,7 @@ func init() {
 
 	flag.BoolVar(&outputJSON, "json", false, "output json")
 	outputType := flag.String("type", "jpg", "output image type")
-	res := flag.String("res", "", "resolution")
+	flag.StringVar(&res, "res", "", "resolution")
 	flag.Parse()
 
 	switch *outputType {
@@ -187,17 +187,18 @@ func init() {
 		imageEncoder = imgio.JPEGEncoder(95)
 		targetExtension = "jpg"
 	}
-	if *res == "" {
+	if res == "" {
 		errLog.Println("[flag] no resolution specified")
 		os.Exit(2)
 	}
 
 	var err error
-	resolution, err = stringToPoint(*res, "x")
+	resolution, err = stringToPoint(res, "x")
 	if err != nil {
 		errLog.Printf("[flag] %s", err)
 		panic(err)
 	}
+
 	if rootDir != "" {
 		if _, err := os.Stat(rootDir); err != nil {
 			if os.IsNotExist(err) {
@@ -206,35 +207,44 @@ func init() {
 			}
 		}
 	}
-	if outputDir == "" && rootDir != "" {
-		outputDir = path.Join(".", *res)
-	}
-	os.MkdirAll(outputDir, 0755)
-	stdin = rootDir == ""
-
 }
 
 func main() {
-	if !stdin {
+	if outputDir == "" {
+		tmpDir, err := ioutil.TempDir("", "tsresize"+res+"-")
+		if err != nil {
+			panic(err)
+		}
+		// pass delete dir onto next step once finished
+		defer utils.EmitPath("#-" + tmpDir)
+		outputDir = tmpDir
+	}
+	// more create dirs
+	os.MkdirAll(outputDir, 0755)
+
+	if rootDir != "" {
 		if err := filepath.Walk(rootDir, visit); err != nil {
 			errLog.Printf("[walk] %s", err)
 		}
-		return
-	}
-	// start scanner and wait for stdin
-	scanner := bufio.NewScanner(os.Stdin)
-	for scanner.Scan() {
-		text := strings.Replace(scanner.Text(), "\n", "", -1)
-		if strings.HasPrefix(text, "[") {
-			errLog.Printf("[stdin] %s", text)
-			continue
-		} else {
-			finfo, err := os.Stat(text)
-			if err != nil {
-				errLog.Printf("[stat] %s", err)
+	} else {
+		// start scanner and wait for stdin
+		scanner := bufio.NewScanner(os.Stdin)
+		for scanner.Scan() {
+			text := strings.Replace(scanner.Text(), "\n", "", -1)
+			if strings.HasPrefix(text, "[") {
+				errLog.Printf("[stdin] %s", text)
 				continue
+			} else if strings.HasPrefix(text, "#-") {
+				// was signalled deletion of previous tmpdir, wait until finished
+				defer os.RemoveAll(strings.TrimPrefix(text, "#-"))
+			} else {
+				finfo, err := os.Stat(text)
+				if err != nil {
+					errLog.Printf("[stat] %s", text)
+					continue
+				}
+				visit(text, finfo, nil)
 			}
-			visit(text, finfo, nil)
 		}
 	}
 }

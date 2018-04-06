@@ -1,34 +1,42 @@
 #!/bin/bash
 #PBS -P xe2
 #PBS -q normal
-#PBS -l ncpus=4
-#PBS -l walltime=00:20:00
+#PBS -l ncpus=8
+#PBS -l walltime=10:00:00
 #PBS -l other=gdata1
-#PBS -l mem=1G
+#PBS -l mem=2G
+#PBS -l jobfs=25G
 #PBS -m abe
-#PBS -M gareth.dunstone@anu.edu.au
+#PBS -M your-email@none.com
 
-TRIAL=TR0114
-LOCATION=GC03
+# this is an example pbs (bash script essentially) for running on raijin.
+# mainly just to demonstrate the use of these tools together as a pipeline
+
+TRIAL=
+LOCATION=
 EXTRA=
 SOURCE="/g/data/xe2/phenomics/camupload/picam/$LOCATION"
 
-if [ -z "$EXTRA" ]; then NAME="$TRIAL-$LOCATION"; else NAME="$TRIAL-$LOCATION-$EXTRA"; fi
+if [ -z "$EXTRA" ]
+then
+  NAME="$TRIAL-$LOCATION"
+else
+  NAME="$TRIAL-$LOCATION-$EXTRA"
+fi
 
 RESOLUTION=1920x1080
 START=2018-04-01
-
 BINPATH=/home/801/gdd801
 
 OUTPUT="/g/data/xe2/phenomics/structured_data/$TRIAL/data/timestreams/outputs/$NAME"
 
 $BINPATH/./tsselect_linux-amd64 -source "$SOURCE" -start "$START" | \
- $BINPATH/./tsalign_linux-amd64 -output "$OUTPUT/$NAME~fullres" | \
- $BINPATH/./tsorganize_linux-amd64 -del | \
- $BINPATH/./tsrename_linux-amd64 -del -name "$NAME~fullres" -output "$OUTPUT/$NAME~fullres" | \
- $BINPATH/./tsresize_linux-amd64 -res 1920x1080 | \
- $BINPATH/./tsorganize_linux-amd64 -del | \
- $BINPATH/./tsrename_linux-amd64 -del -name "$NAME~1920" -output "$OUTPUT/$NAME~1920"
+ $BINPATH/./tsalign_linux-amd64 | \
+ $BINPATH/./tsrename_linux-amd64 -del -name "$NAME~fullres"| \
+ $BINPATH/./tsorganize_linux-amd64 -del -output "$OUTPUT/$NAME~fullres" | \
+ $BINPATH/./tsresize_linux-amd64 -res "$RESOLUTION" | \
+ $BINPATH/./tsrename_linux-amd64 -del -name "$NAME~1920"| \
+ $BINPATH/./tsorganize_linux-amd64 -del -output "$OUTPUT/$NAME~1920"
 
  find "$OUTPUT" -type d -empty -delete
  find "$OUTPUT" -type f -name "*.json" -delete

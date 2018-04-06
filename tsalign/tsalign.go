@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/borevitzlab/go-timestreamtools/utils"
+	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -17,7 +18,7 @@ var (
 	errLog             *log.Logger
 	interval           time.Duration
 	rootDir, outputDir string
-	del, stdin         bool
+	del                bool
 	datetimeFunc       datetimeFunction
 )
 
@@ -72,7 +73,7 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 		return nil
 	}
 
-	if strings.HasPrefix(filepath.Base(filePath), "."){
+	if strings.HasPrefix(filepath.Base(filePath), ".") {
 		return nil
 	}
 
@@ -82,9 +83,8 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 		errLog.Printf("[parse] %s", err)
 		return nil
 	}
-	replaced1 := strings.Replace(newPath, rootDir, "", 1)
-	replaced2 := strings.Replace(replaced1, outputDir, "", 1)
-	newPath = filepath.Join(outputDir, replaced2)
+
+	newPath = filepath.Join(outputDir, filepath.Base(newPath))
 
 	if _, err := os.Stat(newPath); err == nil {
 		// skip existing.
@@ -106,7 +106,11 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 		return nil
 	}
 
-	err = moveOrRename(filePath, absDest)
+	if err := moveOrRename(filePath, absDest); err != nil{
+		errLog.Printf("[move] %s", err)
+		return nil
+	}
+
 	jsFile := filePath + ".json"
 	if _, ferr := os.Stat(jsFile); ferr == nil {
 		if e := moveOrRename(jsFile, absDest+".json"); e != nil {
@@ -150,8 +154,8 @@ func init() {
 
 	flag.DurationVar(&interval, "interval", time.Minute*5, "interval to align to.")
 	flag.StringVar(&rootDir, "source", "", "source directory")
-	flag.StringVar(&outputDir, "output", ".", "output directory")
-
+	flag.StringVar(&outputDir, "output", "", "output directory")
+	flag.BoolVar(&del, "del", false, "delete source images")
 	useExif := flag.Bool("exif", false, "use exif instead of timestamps in filenames")
 	// parse the leading argument with normal flag.Parse
 	flag.Parse()
@@ -170,21 +174,22 @@ func init() {
 			}
 		}
 	}
-
-	os.MkdirAll(outputDir, 0755)
-
-	stdin = rootDir == ""
-
-	outputAbs, _ := filepath.Abs(outputDir)
-	absRoot, _ := filepath.Abs(rootDir)
-
-	// if output and source are the same then it is an in place rename.
-	del = absRoot == outputAbs
-
 }
 
 func main() {
-	if !stdin {
+	if outputDir == "" {
+		tmpDir, err := ioutil.TempDir("", "tsalign-")
+		if err != nil {
+			panic(err)
+		}
+		// pass delete dir onto next step once finished
+		defer utils.EmitPath("#-" + tmpDir)
+		outputDir = tmpDir
+	}
+	// more create dirs
+	os.MkdirAll(outputDir, 0755)
+
+	if rootDir != "" {
 		if err := filepath.Walk(rootDir, visit); err != nil {
 			errLog.Printf("[walk] %s", err)
 		}
@@ -196,6 +201,9 @@ func main() {
 			if strings.HasPrefix(text, "[") {
 				errLog.Printf("[stdin] %s", text)
 				continue
+			} else if strings.HasPrefix(text, "#-") {
+				// was signalled deletion of previous tmpdir, wait until finished
+				defer os.RemoveAll(strings.TrimPrefix(text, "#-"))
 			} else {
 				finfo, err := os.Stat(text)
 				if err != nil {

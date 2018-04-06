@@ -320,6 +320,7 @@ func init() {
 }
 
 func main() {
+
 	if !stdin {
 		c := make(chan error)
 		go func() {
