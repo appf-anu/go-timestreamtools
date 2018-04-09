@@ -2,7 +2,7 @@
 #PBS -P xe2
 #PBS -q normal
 #PBS -l ncpus=8
-#PBS -l walltime=10:00:00
+#PBS -l walltime=05:00:00
 #PBS -l other=gdata1
 #PBS -l mem=2G
 #PBS -l jobfs=25G
@@ -38,5 +38,5 @@ $BINPATH/./tsselect_linux-amd64 -source "$SOURCE" -start "$START" | \
  $BINPATH/./tsrename_linux-amd64 -del -name "$NAME~1920"| \
  $BINPATH/./tsorganize_linux-amd64 -del -output "$OUTPUT/$NAME~1920"
 
- find "$OUTPUT" -type d -empty -delete
- find "$OUTPUT" -type f -name "*.json" -delete
+find "$OUTPUT" -type d -empty -delete
+find "$OUTPUT" -type f -name "*.json" -delete

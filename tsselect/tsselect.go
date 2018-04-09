@@ -15,10 +15,11 @@ import (
 )
 
 var (
-	errLog       *log.Logger
-	rootDir      string
-	start, end   time.Time
-	datetimeFunc datetimeFunction
+	errLog           *log.Logger
+	rootDir          string
+	start, end       time.Time
+	datetimeFunc     datetimeFunction
+	startTod, endTod time.Time
 )
 
 type datetimeFunction func(string) (time.Time, error)
@@ -28,12 +29,18 @@ func inTimeSpan(check time.Time) bool {
 	return check.After(start) && check.Before(end)
 }
 
+func inTimeOfDay(t time.Time) bool {
+	st := time.Date(t.Year(), t.Month(), t.Day(), startTod.Hour(), startTod.Minute(), startTod.Second(), startTod.Nanosecond(), t.Location())
+	en := time.Date(t.Year(), t.Month(), t.Day(), endTod.Hour(), endTod.Minute(), endTod.Second(), endTod.Nanosecond(), t.Location())
+	return t.After(st) && t.Before(en) || t == en || t == st
+}
+
 func checkFilePath(thisFile string) (bool, error) {
 	thisTime, err := datetimeFunc(thisFile)
 	if err != nil {
 		return false, err
 	}
-	return inTimeSpan(thisTime), nil
+	return inTimeSpan(thisTime) && inTimeOfDay(thisTime), nil
 }
 
 func visit(filePath string, info os.FileInfo, _ error) error {
@@ -71,6 +78,8 @@ var usage = func() {
 	fmt.Println()
 	fmt.Println("\t-start: the start datetime (default=1970-01-01 00:00)")
 	fmt.Println("\t-end: the end datetime (default=now)")
+	fmt.Println("\t-starttod: the start time of day, default 00:00:00")
+	fmt.Println("\t-endtod: the end time of day, default 23:59:59")
 	fmt.Println("\t-exif: uses exif data to get time instead of the file timestamp")
 	fmt.Println("\t-source: set the <source> directory (optional, default=stdin)")
 	fmt.Println()
@@ -82,6 +91,57 @@ var usage = func() {
 	fmt.Println("tsselect is NON DESTRUCTIVE, and doesnt copy/move files, it only filters")
 }
 
+func parseDateTime(tString string, t *time.Time, defaultValue time.Time) error {
+	ctx := fuzzytime.Context{
+		DateResolver: fuzzytime.DMYResolver,
+		TZResolver:   fuzzytime.DefaultTZResolver("UTC"),
+	}
+	datetimeValue, _, err := ctx.Extract(tString)
+	if err != nil {
+		errLog.Printf("[time] couldn't extract datetime: %s", err)
+	}
+
+	if datetimeValue.Empty() {
+		*t = defaultValue
+	} else {
+		datetimeValue.Time.SetHour(datetimeValue.Time.Hour())
+		datetimeValue.Time.SetMinute(datetimeValue.Time.Minute())
+		datetimeValue.Time.SetSecond(datetimeValue.Time.Second())
+		datetimeValue.Time.SetTZOffset(datetimeValue.Time.TZOffset())
+		*t, err = time.Parse(time.RFC3339, datetimeValue.ISOFormat())
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func parseTime(tString string, t *time.Time, defaultValue time.Time) error {
+	ctx := fuzzytime.Context{
+		DateResolver: fuzzytime.DMYResolver,
+		TZResolver:   fuzzytime.DefaultTZResolver("UTC"),
+	}
+	datetimeValue, _, err := ctx.Extract(tString)
+	if err != nil {
+		errLog.Printf("[time] couldn't extract datetime: %s", err)
+	}
+
+	if datetimeValue.Empty() {
+		fmt.Println(defaultValue)
+		*t = defaultValue
+	} else {
+		datetimeValue.Time.SetHour(datetimeValue.Time.Hour())
+		datetimeValue.Time.SetMinute(datetimeValue.Time.Minute())
+		datetimeValue.Time.SetSecond(datetimeValue.Time.Second())
+		datetimeValue.Time.SetTZOffset(datetimeValue.Time.TZOffset())
+		*t, err = time.Parse("T15:04:05Z07:00", datetimeValue.ISOFormat())
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func init() {
 	errLog = log.New(os.Stderr, "[tsselect] ", log.Ldate|log.Ltime|log.Lshortfile)
 	flag.Usage = usage
@@ -90,6 +150,8 @@ func init() {
 	flag.StringVar(&rootDir, "source", "", "source directory")
 	startString := flag.String("start", "", "start datetime")
 	endString := flag.String("end", "", "end datetime")
+	startTodString := flag.String("starttod", "", "start time of day")
+	endTodString := flag.String("endtod", "", "end time of day")
 	useExif := flag.Bool("exif", false, "use exif instead of timestamps in filenames")
 	// parse the leading argument with normal flag.Parse
 	flag.Parse()
@@ -100,41 +162,31 @@ func init() {
 		datetimeFunc = utils.GetTimeFromFileTimestamp
 	}
 
+	defaultStart, _ := time.Parse(time.RFC3339, "1970-01-01T00:00:00Z")
+	defaultEnd, _ := time.Parse(utils.TsForm, time.Now().Format(utils.TsForm))
+	defaultStartTod, _ := time.Parse(time.RFC3339, "1970-01-01T00:00:00Z")
+	defaultEndTod, _ := time.Parse(time.RFC3339, "1970-01-01T23:59:59Z")
 
-	ctx := fuzzytime.Context{
-		DateResolver: fuzzytime.DMYResolver,
-		TZResolver:   fuzzytime.DefaultTZResolver("UTC"),
-	}
-	startDatetime, _, err := ctx.Extract(*startString)
+	err := parseDateTime(*startString, &start, defaultStart)
 	if err != nil {
-		errLog.Printf("[time] couldn't extract start datetime: %s", err)
+		panic(err)
 	}
 
-	if startDatetime.Empty() {
-		start, _ = time.Parse(time.RFC3339, "1970-01-01T00:00:00Z00:00")
-	} else {
-		startDatetime.Time.SetHour(startDatetime.Time.Hour())
-		startDatetime.Time.SetMinute(startDatetime.Time.Minute())
-		startDatetime.Time.SetSecond(startDatetime.Time.Second())
-		startDatetime.Time.SetTZOffset(startDatetime.Time.TZOffset())
-
-		start, _ = time.Parse(time.RFC3339, startDatetime.ISOFormat())
-	}
-	endDatetime, _, err := ctx.Extract(*endString)
+	err = parseDateTime(*endString, &end, defaultEnd)
 	if err != nil {
-		errLog.Printf("[time] couldn't extract end datetime: %s", err)
+		panic(err)
 	}
 
-	if endDatetime.Empty() {
-		end, _ = time.Parse(utils.TsForm, time.Now().Format(utils.TsForm))
-
-	} else {
-		endDatetime.Time.SetHour(endDatetime.Time.Hour())
-		endDatetime.Time.SetMinute(endDatetime.Time.Minute())
-		endDatetime.Time.SetSecond(endDatetime.Time.Second())
-		endDatetime.Time.SetTZOffset(endDatetime.Time.TZOffset())
-		end, _ = time.Parse(time.RFC3339, endDatetime.ISOFormat())
+	err = parseTime(*startTodString, &startTod, defaultStartTod)
+	if err != nil {
+		panic(err)
 	}
+
+	err = parseTime(*endTodString, &endTod, defaultEndTod)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(defaultEndTod)
 
 	// verify that root exists
 	if rootDir != "" {
@@ -145,7 +197,6 @@ func init() {
 			}
 		}
 	}
-
 }
 
 func main() {
