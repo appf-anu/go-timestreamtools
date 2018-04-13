@@ -10,6 +10,7 @@ import (
 	"github.com/borevitzlab/go-timestreamtools/utils"
 	"github.com/rwcarlsen/goexif/exif"
 	"golang.org/x/image/tiff"
+	//"github.com/mdaffin/go-telegraf"
 	"image"
 	"io"
 	"io/ioutil"
@@ -19,15 +20,16 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	//"time"
 )
 
 var (
-	errLog                              *log.Logger
-	rootDir, outputDir, targetExtension string
-	resolution                          image.Point
-	res                                 string
-	imageEncoder                        imgio.Encoder
-	outputJSON                          bool
+	errLog                                            *log.Logger
+	rootDir, outputDir, targetExtension, telegrafName string
+	resolution                                        image.Point
+	res                                               string
+	imageEncoder                                      imgio.Encoder
+	outputJSON                                        bool
 )
 
 // TIFFEncoder returns an encoder to the Tagged Image Format
@@ -159,6 +161,7 @@ func init() {
 	errLog = log.New(os.Stderr, "[tsresize] ", log.Ldate|log.Ltime|log.Lshortfile)
 	flag.Usage = usage
 	// set flags for flag
+	flag.StringVar(&telegrafName, "tname", "", "name for telegraf")
 	flag.StringVar(&rootDir, "source", "", "source directory")
 	flag.StringVar(&outputDir, "output", "", "output directory")
 
@@ -210,6 +213,11 @@ func init() {
 }
 
 func main() {
+	//telegrafClient, telegrafClientErr := telegraf.NewUnix("telegraf.sock")
+	//if telegrafClientErr != nil {
+	//	errLog.Printf("[telegraf] Cannot create telegraf client QWTF!!!?: ", telegrafClientErr)
+	//}
+
 	if outputDir == "" {
 		tmpDir, err := ioutil.TempDir("", "tsresize"+res+"-")
 		if err != nil {
@@ -243,7 +251,16 @@ func main() {
 					errLog.Printf("[stat] %s", text)
 					continue
 				}
+				//start := time.Now()
 				visit(text, finfo, nil)
+				//if telegrafName != "" && telegrafClientErr == nil{
+				//
+				//	m := telegraf.MeasureFloat64("resize", "resize_time", time.Since(start).Seconds())
+				//	m.AddTag("name", telegrafName)
+				//	m.AddTag("operation", "resize")
+				//	m.AddString("filepath", text)
+				//	telegrafClient.Write(m)
+				//}
 			}
 		}
 	}

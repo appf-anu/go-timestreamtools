@@ -9,9 +9,12 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 )
 
@@ -20,6 +23,9 @@ var (
 	rootDir, outputDir, archiveName string
 	weeklyFileWriter                []*os.File
 	weeklyTarWriters                map[time.Time]*tar.Writer
+	thisSunday, lastSunday          time.Time
+	del                             bool
+	mutex                           *sync.Mutex
 )
 
 func addFile(tw *tar.Writer, thePath string) error {
@@ -28,6 +34,7 @@ func addFile(tw *tar.Writer, thePath string) error {
 		return err
 	}
 	defer file.Close()
+
 	if stat, err := file.Stat(); err == nil {
 		// now lets create the header as needed for this file within the tarball
 		header := new(tar.Header)
@@ -36,6 +43,9 @@ func addFile(tw *tar.Writer, thePath string) error {
 		header.Mode = int64(stat.Mode())
 		header.ModTime = stat.ModTime()
 		// write the header to the tarball archive
+		// and lock to stop the program closing the tarfile while we're writing to it.
+		mutex.Lock()
+		defer mutex.Unlock()
 		if err := tw.WriteHeader(header); err != nil {
 			return err
 		}
@@ -44,6 +54,7 @@ func addFile(tw *tar.Writer, thePath string) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -80,15 +91,36 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 
 	t, err := utils.GetTimeFromFileTimestamp(filePath)
 	if err != nil {
-		errLog.Printf("%s", err)
+		errLog.Println(err)
 		return nil
 	}
 	sunday := truncateTimeToSunday(t)
+	if sunday == thisSunday || sunday == lastSunday {
+		// dont do anything to this weeks or last weeks files.
+		return nil
+	}
 
 	if _, ok := weeklyTarWriters[sunday]; !ok {
-		tarbaseName := getNameFromFilepath(filePath, sunday)
+		tarbaseName := getNameFromFilepath(filePath, sunday.Add(time.Hour*24*6))
 		tarPath := path.Join(outputDir, tarbaseName)
-		file, err := os.Create(tarPath)
+		var file *os.File
+		if _, err := os.Stat(tarPath); os.IsNotExist(err) {
+			file, err = os.Create(tarPath)
+			if err != nil {
+				errLog.Printf("%s", err)
+				panic(err)
+			}
+		} else {
+			file, err = os.OpenFile(tarPath, os.O_RDWR, os.ModePerm)
+			if err != nil {
+				errLog.Printf("%s", err)
+				panic(err)
+			}
+			if _, err = file.Seek(-2<<9, io.SeekEnd); err != nil {
+				log.Fatalln(err)
+			}
+		}
+
 		if err != nil {
 			errLog.Printf("%s", err)
 			panic(err)
@@ -99,10 +131,16 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 	}
 
 	if err := addFile(weeklyTarWriters[sunday], filePath); err != nil {
-		errLog.Printf("%s", err)
+		errLog.Println(err)
 		return nil
 	}
 
+	if del {
+		err := os.Remove(filePath)
+		if err != nil {
+			errLog.Println(err)
+		}
+	}
 	if absPath, err := filepath.Abs(filePath); err == nil {
 		utils.EmitPath(absPath)
 	} else {
@@ -121,6 +159,7 @@ var usage = func() {
 	fmt.Println()
 	fmt.Println("\t-output: set the <destination> directory (default=.)")
 	fmt.Println("\t-source: set the <source> directory (optional, default=stdin)")
+	fmt.Println("\t-del: delete the source files as they are archived.")
 	fmt.Println("\t-name: set the name prefix of the output tarfile <name>2006-01-02.tar (default=guess)")
 	fmt.Println()
 	fmt.Println("reads filepaths from stdin")
@@ -134,7 +173,8 @@ func init() {
 	// set flags for flagset
 	flag.StringVar(&rootDir, "source", "", "source directory")
 	flag.StringVar(&outputDir, "output", "", "output directory")
-	flag.StringVar(&archiveName, "name", "", "output directory")
+	flag.StringVar(&archiveName, "name", "", "archive name prefix")
+	flag.BoolVar(&del, "del", false, "delete source files")
 	// parse the leading argument with normal flag.Parse
 	flag.Parse()
 
@@ -147,24 +187,37 @@ func init() {
 			}
 		}
 	}
-
-	// more create dirs
 	if outputDir == "" {
-		if rootDir == "" {
-			outputDir, _ = os.Getwd()
-		} else {
-			outputDir = rootDir
-		}
-		errLog.Printf("[path] no <destination>, creating %s", outputDir)
+		panic(fmt.Errorf("[archive] no output directory specified"))
 	}
+
 	if _, err := os.Stat(outputDir); err != nil {
 		os.MkdirAll(outputDir, 0755)
 	}
+	thisSunday = truncateTimeToSunday(time.Now())
+	lastSunday = truncateTimeToSunday(time.Now()).Add(-time.Hour * 24 * 7)
 }
 
 func main() {
-
+	mutex = &sync.Mutex{}
 	weeklyTarWriters = make(map[time.Time]*tar.Writer)
+
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigs
+		mutex.Lock()
+		for sunday, writer := range weeklyTarWriters {
+			errLog.Printf("[tar] closing %s tar writer", sunday.Format("2006-01-02"))
+			writer.Close()
+		}
+		for i := range weeklyFileWriter {
+			weeklyFileWriter[i].Close()
+		}
+		mutex.Unlock()
+		os.Exit(0)
+	}()
+
 	if rootDir != "" {
 		if err := filepath.Walk(rootDir, visit); err != nil {
 			errLog.Printf("[walk] %s", err)
@@ -188,7 +241,7 @@ func main() {
 			}
 		}
 	}
-
+	mutex.Lock()
 	for sunday, writer := range weeklyTarWriters {
 		errLog.Printf("[tar] closing %s tar writer", sunday.Format("2006-01-02"))
 		writer.Close()
@@ -197,4 +250,6 @@ func main() {
 	for i := range weeklyFileWriter {
 		weeklyFileWriter[i].Close()
 	}
+	mutex.Unlock()
+	os.Exit(0)
 }

@@ -1,0 +1,26 @@
+#!/bin/bash
+#PBS -P xe2
+#PBS -q copyq
+#PBS -l ncpus=1
+#PBS -l walltime=3:00:00
+#PBS -l other=gdata1
+#PBS -l mem=2G
+#PBS -l jobfs=1G
+#PBS -m abe
+#PBS -M xxxx@xxx
+
+# another example pbs script, this exclusively resize and renames
+
+# requires SOURCE
+
+NAME=`basename "$SOURCE"`
+RESOLUTION=1920x1080
+START=2018-04-01
+BINPATH=/home/801/gdd801
+
+OUTPUT="/g/data/xe2/phenomics/camupload/picam/$NAME-archive"
+
+$BINPATH/./tsarchive_linux-amd64 -source "$SOURCE" -name "$NAME" -output "$OUTPUT"
+
+# find "$OUTPUT" -type d -empty -delete
+# find "$OUTPUT" -type f -name "*.json" -delete
