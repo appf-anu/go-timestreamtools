@@ -127,7 +127,6 @@ func parseTime(tString string, t *time.Time, defaultValue time.Time) error {
 	}
 
 	if datetimeValue.Empty() {
-		fmt.Println(defaultValue)
 		*t = defaultValue
 	} else {
 		datetimeValue.Time.SetHour(datetimeValue.Time.Hour())
@@ -186,7 +185,6 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(defaultEndTod)
 
 	// verify that root exists
 	if rootDir != "" {
@@ -201,6 +199,7 @@ func init() {
 
 func main() {
 	if rootDir != "" {
+
 		if err := filepath.Walk(rootDir, visit); err != nil {
 			errLog.Printf("[walk] %s", err)
 		}
