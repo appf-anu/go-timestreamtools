@@ -40,6 +40,3 @@ $BINPATH/./tsselect_linux-amd64 -source "$SOURCE" -start "$START" | \
  $BINPATH/./tsresize_linux-amd64 -res "$RESOLUTION" | \
  $BINPATH/./tsrename_linux-amd64 -del -name "$NAME~1920"| \
  $BINPATH/./tsorganize_linux-amd64 -del -output "$OUTPUT/$NAME~1920"
-#
-# find "$OUTPUT" -type d -empty -delete
-# find "$OUTPUT" -type f -name "*.json" -delete

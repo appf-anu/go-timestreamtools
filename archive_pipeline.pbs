@@ -21,6 +21,3 @@ BINPATH=/home/801/gdd801
 OUTPUT="/g/data/xe2/phenomics/camupload/picam/$NAME-archive"
 
 $BINPATH/./tsarchive_linux-amd64 -source "$SOURCE" -name "$NAME" -output "$OUTPUT"
-
-# find "$OUTPUT" -type d -empty -delete
-# find "$OUTPUT" -type f -name "*.json" -delete

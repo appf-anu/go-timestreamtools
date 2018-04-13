@@ -28,6 +28,3 @@ echo "$OUTPUT/$OUTPUTNAME"
 $BINPATH/./tsresize_linux-amd64 -source "$SOURCE" -res "$RESOLUTION" | \
  $BINPATH/./tsrename_linux-amd64 -del -name "$OUTPUTNAME"| \
  $BINPATH/./tsorganize_linux-amd64 -del -output "$OUTPUT/$OUTPUTNAME"
-
-# find "$OUTPUT" -type d -empty -delete
-# find "$OUTPUT" -type f -name "*.json" -delete
