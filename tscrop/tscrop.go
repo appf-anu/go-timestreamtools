@@ -26,8 +26,9 @@ var (
 	errLog                              *log.Logger
 	rootDir, outputDir, targetExtension string
 	corner1, corner2, gridxy, chunkSize image.Point
-	stdin, center                       bool
 	imageEncoder                        imgio.Encoder
+	center                      		bool
+
 )
 
 // TIFFEncoder returns an encoder to the Tagged Image Format
@@ -305,51 +306,57 @@ func init() {
 		}
 	}
 
-	if outputDir == "" {
-		cropFmtCenter := fmt.Sprintf("%d,%d", corner1.X, corner1.Y)
-		cropFmt := fmt.Sprintf("%d,%d-%d,%d", corner1.X, corner1.Y, corner2.X, corner2.Y)
-		if center {
-			outputDir = path.Join(".", cropFmtCenter)
-		} else {
-			outputDir = path.Join(".", cropFmt)
-		}
-	}
-	os.MkdirAll(outputDir, 0755)
-	stdin = rootDir == ""
 
+	if _, err := os.Stat(outputDir); err != nil {
+		os.MkdirAll(outputDir, 0755)
+	}
 }
 
 func main() {
 
-	if !stdin {
-		c := make(chan error)
-		go func() {
-			c <- filepath.Walk(rootDir, visit)
-		}()
-
-		if err := <-c; err != nil {
-			errLog.Printf("[goroutine] %s", err)
+	if outputDir == "" {
+		tmpDir, err := ioutil.TempDir("", "tscrop-")
+		if err != nil {
+			panic(err)
 		}
-		return
-		//if err := filepath.Walk(rootDir, visit); err != nil {
-		//	errLog.Printf("[walk] %s", err)
-		//}
-		//return
+		// pass delete dir onto next step once finished
+		defer utils.EmitPath("#-" + tmpDir)
+		outputDir = tmpDir
 	}
-	// start scanner and wait for stdin
-	scanner := bufio.NewScanner(os.Stdin)
-	for scanner.Scan() {
-		text := strings.Replace(scanner.Text(), "\n", "", -1)
-		if strings.HasPrefix(text, "[") {
-			errLog.Printf("[stdin] %s", text)
-			continue
-		} else {
-			finfo, err := os.Stat(text)
-			if err != nil {
-				errLog.Printf("[stat] %s", err)
+
+	cropFmtCenter := fmt.Sprintf("%d,%d", corner1.X, corner1.Y)
+	cropFmt := fmt.Sprintf("%d,%d-%d,%d", corner1.X, corner1.Y, corner2.X, corner2.Y)
+
+	if center {
+		outputDir = path.Join(outputDir, cropFmtCenter)
+	} else {
+		outputDir = path.Join(outputDir, cropFmt)
+	}
+
+	if rootDir != "" {
+		if err := filepath.Walk(rootDir, visit); err != nil {
+			errLog.Printf("[walk] %s", err)
+		}
+	} else {
+		// start scanner and wait for stdin
+		scanner := bufio.NewScanner(os.Stdin)
+		for scanner.Scan() {
+
+			text := strings.Replace(scanner.Text(), "\n", "", -1)
+			if strings.HasPrefix(text, "[") {
+				errLog.Printf("[stdin] %s", text)
 				continue
+			} else if strings.HasPrefix(text, "#-") {
+				// was signalled deletion of previous tmpdir, wait until finished
+				defer os.RemoveAll(strings.TrimPrefix(text, "#-"))
+			} else {
+				finfo, err := os.Stat(text)
+				if err != nil {
+					errLog.Printf("[stat] %s", text)
+					continue
+				}
+				visit(text, finfo, nil)
 			}
-			visit(text, finfo, nil)
 		}
 	}
 

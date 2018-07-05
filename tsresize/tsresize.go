@@ -228,7 +228,7 @@ func main() {
 		outputDir = tmpDir
 	}
 	// more create dirs
-	os.MkdirAll(outputDir, 0755)
+	os.MkdirAll(outputDir, 0750)
 
 	if rootDir != "" {
 		if err := filepath.Walk(rootDir, visit); err != nil {
@@ -251,16 +251,7 @@ func main() {
 					errLog.Printf("[stat] %s", text)
 					continue
 				}
-				//start := time.Now()
 				visit(text, finfo, nil)
-				//if telegrafName != "" && telegrafClientErr == nil{
-				//
-				//	m := telegraf.MeasureFloat64("resize", "resize_time", time.Since(start).Seconds())
-				//	m.AddTag("name", telegrafName)
-				//	m.AddTag("operation", "resize")
-				//	m.AddString("filepath", text)
-				//	telegrafClient.Write(m)
-				//}
 			}
 		}
 	}

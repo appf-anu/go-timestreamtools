@@ -85,7 +85,7 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 	}
 
 	// make directories
-	err = os.MkdirAll(path.Dir(newPath), 0755)
+	err = os.MkdirAll(path.Dir(newPath), 0750)
 	if err != nil {
 		errLog.Printf("[mkdir] %s", err)
 		return nil

@@ -14,13 +14,46 @@ import (
 
 const (
 	// ArchiveForm is the form that tar files should take (YYYY-MM-DD)
-	ArchiveForm                 = "%s2006-01-02.tar"
+	ArchiveForm                 = "%s~2006-01-02.tar"
 	// DefaultTsDirectoryStructure is the default directory structure for timestreams
 	DefaultTsDirectoryStructure = "2006/2006_01/2006_01_02/2006_01_02_15/"
 	// TsForm is the timestamp form for individual files.
 	TsForm                      = "2006_01_02_15_04_05"
 	dumbExifForm                = "2006:01:02 15:04:05"
 	tsRegexPattern              = "[0-9][0-9][0-9][0-9]_[0-1][0-9]_[0-3][0-9]_[0-2][0-9]_[0-5][0-9]_[0-5][0-9]"
+)
+
+const (
+	OS_READ = 04
+	OS_WRITE = 02
+	OS_EX = 01
+	OS_USER_SHIFT = 6
+	OS_GROUP_SHIFT = 3
+	OS_OTH_SHIFT = 0
+
+	OS_USER_R = OS_READ<<OS_USER_SHIFT
+	OS_USER_W = OS_WRITE<<OS_USER_SHIFT
+	OS_USER_X = OS_EX<<OS_USER_SHIFT
+	OS_USER_RW = OS_USER_R | OS_USER_W
+	OS_USER_RWX = OS_USER_RW | OS_USER_X
+
+	OS_GROUP_R = OS_READ<<OS_GROUP_SHIFT
+	OS_GROUP_W = OS_WRITE<<OS_GROUP_SHIFT
+	OS_GROUP_X = OS_EX<<OS_GROUP_SHIFT
+	OS_GROUP_RW = OS_GROUP_R | OS_GROUP_W
+	OS_GROUP_RWX = OS_GROUP_RW | OS_GROUP_X
+
+	OS_OTH_R = OS_READ<<OS_OTH_SHIFT
+	OS_OTH_W = OS_WRITE<<OS_OTH_SHIFT
+	OS_OTH_X = OS_EX<<OS_OTH_SHIFT
+	OS_OTH_RW = OS_OTH_R | OS_OTH_W
+	OS_OTH_RWX = OS_OTH_RW | OS_OTH_X
+
+	OS_ALL_R = OS_USER_R | OS_GROUP_R | OS_OTH_R
+	OS_ALL_W = OS_USER_W | OS_GROUP_W | OS_OTH_W
+	OS_ALL_X = OS_USER_X | OS_GROUP_X | OS_OTH_X
+	OS_ALL_RW = OS_ALL_R | OS_ALL_W
+	OS_ALL_RWX = OS_ALL_RW | OS_GROUP_X
 )
 
 // EmitPath writes a filepath to stdout
@@ -96,7 +129,7 @@ func GetTimeFromFileTimestamp(thisFile string) (time.Time, error) {
 	timestamp := TsRegex.FindString(thisFile)
 	if len(timestamp) < 1 {
 		// no timestamp found in filename
-		return time.Time{}, fmt.Errorf("failed regex timestamp from filename")
+		return time.Time{}, fmt.Errorf("failed regex timestamp from filename %s", thisFile)
 	}
 
 	t, err := time.Parse(TsForm, timestamp)
@@ -121,6 +154,9 @@ func MoveFilebyCopy(src, dst string, del bool) error {
 	if err != nil {
 		return err
 	}
+	fileMode := os.FileMode(OS_USER_RW|OS_GROUP_RW)
+	d.Chmod(fileMode)
+
 	if _, err := io.Copy(d, s); err != nil {
 		d.Close()
 		return err

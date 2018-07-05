@@ -58,17 +58,17 @@ func addFile(tw *tar.Writer, thePath string) error {
 	return nil
 }
 
-func getNameFromFilepath(thisFile string, sunday time.Time) string {
+func getPartNameFromFilepath(thisFile string, sunday time.Time) string {
 	name := archiveName
 	if archiveName != "" {
 		timestamp := utils.TsRegex.FindString(thisFile)
 		baseFile := path.Base(thisFile)
 		ext := path.Ext(baseFile)
 		filename := strings.TrimSuffix(baseFile, ext)
-		name = strings.Replace(filename, timestamp, "", 1)
+		name = strings.Replace(filename,"_"+timestamp, "", 1)
 	}
 	datedArchive := sunday.Format(utils.ArchiveForm)
-	return fmt.Sprintf(datedArchive, name)
+	return fmt.Sprintf(datedArchive, name)+".part"
 }
 
 func truncateTimeToSunday(t time.Time) (sunday time.Time) {
@@ -176,7 +176,7 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 		return nil
 	}
 	basePath := filepath.Base(filePath)
-	tarbaseName := getNameFromFilepath(filePath, sunday.Add(time.Hour*24*6))
+	tarbaseName := getPartNameFromFilepath(filePath, sunday.Add(time.Hour*24*6))
 	tarPath := path.Join(outputDir, tarbaseName)
 
 
@@ -221,7 +221,7 @@ var usage = func() {
 	fmt.Println("\t-output: set the <destination> directory (default=.)")
 	fmt.Println("\t-source: set the <source> directory (optional, default=stdin)")
 	fmt.Println("\t-del: delete the source files as they are archived.")
-	fmt.Println("\t-name: set the name prefix of the output tarfile <name>2006-01-02.tar (default=guess)")
+	fmt.Println("\t-name: set the name prefix of the output tarfile <name>~2006-01-02.tar (default=guess)")
 	fmt.Println()
 	fmt.Println("reads filepaths from stdin")
 	fmt.Println("writes paths to resulting files to stdout")
@@ -253,7 +253,7 @@ func init() {
 	}
 
 	if _, err := os.Stat(outputDir); err != nil {
-		os.MkdirAll(outputDir, 0755)
+		os.MkdirAll(outputDir, 0750)
 	}
 	thisSunday = truncateTimeToSunday(time.Now())
 	lastSunday = truncateTimeToSunday(time.Now()).Add(-time.Hour * 24 * 7)
@@ -275,7 +275,9 @@ func main() {
 		}
 		for sunday, writer := range weeklyFileWriters {
 			errLog.Printf("[tar] closing %s file writer", sunday.Format("2006-01-02"))
+			partName := writer.Name()
 			writer.Close()
+			os.Rename(partName, strings.TrimSuffix(partName, ".part"))
 		}
 		mutex.Unlock()
 		os.Exit(0)
@@ -294,7 +296,10 @@ func main() {
 			if strings.HasPrefix(text, "[") {
 				errLog.Printf("[stdin] %s", text)
 				continue
-			} else {
+			} else if strings.HasPrefix(text, "#-") {
+				// was signalled deletion of previous tmpdir, wait until finished
+				defer os.RemoveAll(strings.TrimPrefix(text, "#-"))
+			}  else {
 				finfo, err := os.Stat(text)
 				if err != nil {
 					errLog.Printf("[stat] %s", text)
@@ -311,7 +316,9 @@ func main() {
 	}
 	for sunday, writer := range weeklyFileWriters {
 		errLog.Printf("[tar] closing %s file writer", sunday.Format("2006-01-02"))
+		partName := writer.Name()
 		writer.Close()
+		os.Rename(partName, strings.TrimSuffix(partName, ".part"))
 	}
 	mutex.Unlock()
 	os.Exit(0)
