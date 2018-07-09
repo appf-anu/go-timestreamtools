@@ -1,4 +1,4 @@
-package main
+package maingf
 
 import (
 	"bufio"
@@ -16,67 +16,71 @@ import (
 
 var (
 	errLog                          *log.Logger
-	rootDir, outputDir, namedOutput string
-	del                             bool
-	datetimeFunc                    datetimeFunction
+	rootDir, outputDir, namedOutput, outfmt, infmt string
 )
 
-type datetimeFunction func(string) (time.Time, error)
 
-func parseFilename(thisFile string) (string, error) {
-	thisTime, err := datetimeFunc(thisFile)
-	if err != nil {
-		return "", err
+func contains(s []string, e string) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
 	}
+	return false
+}
 
-	ext := path.Ext(thisFile)
-	if ext == ".jpeg" {
+func parseFilename(img utils.Image) (string, error) {
+	ext := path.Ext(img.Path)
+
+	if contains([]string{".jpeg", ".JPG", ".JPEG"}, ext) {
 		ext = ".jpg"
 	}
-	if ext == ".tiff" {
+	if contains([]string{".tif", ".TIF", ".TIFF"}, ext) {
 		ext = ".tif"
 	}
-	targetFilename := namedOutput + "_" + thisTime.Format(utils.TsForm) + "_00" + ext
+
+	// this could at some point use ms at the end, but rn is just zero
+	targetFilename := namedOutput + "_" + img.Timestamp.Format(utils.TsForm) + "_00" + ext
 
 	newT := path.Join(outputDir, targetFilename)
 
 	return newT, nil
 }
 
-func moveOrRename(source, dest string) error {
+func moveOrRename(img utils.Image, dest string) error {
 	// rename/copy+del if del is true otherwise moveFilebyCopy to not del.
 	var err error
-	if del {
-		err = os.Rename(source, dest)
-		if err != nil {
-			err = utils.MoveFilebyCopy(source, dest, del)
+
+	if len(img.Data) != 0 {
+		err = utils.WriteImageToFile(img, dest)
+	}else{
+		if err = utils.MoveFilebyCopy(img.Path, dest); err != nil {
+			errLog.Printf("[move] %s", err)
+			return nil
 		}
-	} else {
-		err = utils.MoveFilebyCopy(source, dest, del)
 	}
-	if err != nil {
-		errLog.Printf("[move] %s", err)
-		return nil
-	}
+
 	return err
 }
 
-func visit(filePath string, info os.FileInfo, _ error) error {
-	// skip directories
+func visitWalk(filePath string, info os.FileInfo, _ error) error {
 	// skip directories
 	if info.IsDir() {
 		return nil
 	}
-	if path.Ext(filePath) == ".json" {
-		return nil
+	image, err := utils.LoadImage(filePath)
+	image.OriginalPath = filePath
+	if err != nil {
+		errLog.Printf("[load] %s", err)
 	}
 
-	if strings.HasPrefix(filepath.Base(filePath), ".") {
-		return nil
-	}
+	return visit(image)
+}
+
+func visit(image utils.Image) error {
 
 	// parse the new filepath
-	newPath, err := parseFilename(filePath)
+	newPath, err := parseFilename(image)
 	if err != nil {
 		errLog.Printf("[parse] %s", err)
 		return nil
@@ -89,48 +93,43 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 		return nil
 	}
 
-	absSrc, _ := filepath.Abs(filePath)
+	absSrc, _ := filepath.Abs(image.Path)
 	absDest, _ := filepath.Abs(newPath)
 	if absSrc == absDest {
 		errLog.Printf("[dupe] %s", absDest)
+		image.Path = absDest
+		utils.Emit(image, outfmt) // still emit image if it exists in destination
 		return nil
 	}
 
-	if err := moveOrRename(filePath, absDest); err != nil{
+	if err := moveOrRename(image, absDest); err != nil{
 		errLog.Printf("[move] %s", err)
 		return nil
 	}
+	image.Path = absDest
 
-	jsFile := filePath + ".json"
-	if _, ferr := os.Stat(jsFile); ferr == nil {
-		if e := moveOrRename(jsFile, absDest+".json"); e != nil {
-			errLog.Printf("[exif] couldn't move json exif file")
-		}
-	}
-
-	utils.EmitPath(newPath)
-
+	utils.Emit(image, outfmt)
 	return err
 }
 
 var usage = func() {
-	fmt.Printf("usage of %s:\n", os.Args[0])
-	fmt.Println()
-	fmt.Println("\tcopy with <name> prefix:")
-	fmt.Printf("\t\t %s -source <source> -name=<name>\n", os.Args[0])
-	fmt.Println("\tcopy with <name> prefix:")
-	fmt.Printf("\t\t %s -source <source> -name=<name>\n", os.Args[0])
-	fmt.Println()
-	fmt.Println("flags:")
-	fmt.Println("\t-del: removes the source files")
-	fmt.Println("\t-name: renames the prefix fo the target files")
-	fmt.Println("\t-exif: uses exif data to rename rather than file timestamp")
-	fmt.Println("\t-output: set the <destination> directory (default=tmpdir)")
-	fmt.Println("\t-source: set the <source> directory (optional, default=stdin)")
-	fmt.Println()
-	fmt.Println("reads filepaths from stdin")
-	fmt.Println("writes paths to resulting files to stdout")
-	fmt.Println("will ignore any line from stdin that isnt a filepath (and only a filepath)")
+	use:= `
+usage of %s:
+
+	copy with <name> prefix:
+		%s -source <source> -name=<name>
+	copy with <name> prefix:
+		%s -source <source> -name=<name>
+
+flags:
+	-name: renames the prefix fo the target files
+	-output: set the <destination> directory (set to "tmp" to use and output a temporary dir)
+	-source: set the <source> directory (optional, default=stdin)
+	-outfmt: output format (choices: json,msgpack,path default=path)
+	-infmt: input format (choices: json,msgpack,path default=path)
+
+`
+fmt.Printf(use, os.Args[0], os.Args[0], os.Args[0])
 }
 
 func init() {
@@ -140,17 +139,12 @@ func init() {
 	flag.StringVar(&namedOutput, "name", "", "name for the stream")
 	flag.StringVar(&rootDir, "source", "", "source directory")
 	flag.StringVar(&outputDir, "output", "", "output directory")
-	flag.BoolVar(&del, "del", false, "delete source files")
 
-	useExif := flag.Bool("exif", false, "use exif instead of timestamps in filenames")
+	flag.StringVar(&outfmt, "outfmt", "path", "output format")
+	flag.StringVar(&infmt, "infmt", "path", "input format")
 	// parse the leading argument with normal flag.Parse
 	flag.Parse()
 
-	if *useExif {
-		datetimeFunc = utils.GetTimeFromExif
-	} else {
-		datetimeFunc = utils.GetTimeFromFileTimestamp
-	}
 	// create dirs
 	if rootDir != "" {
 		if _, err := os.Stat(rootDir); err != nil {
@@ -163,42 +157,72 @@ func init() {
 }
 
 func main() {
-
-	if outputDir == "" {
+	if outputDir == "tmp" {
 		tmpDir, err := ioutil.TempDir("", "tsrename-")
 		if err != nil {
 			panic(err)
 		}
-		// pass delete dir onto next step once finished
-		defer utils.EmitPath("#-" + tmpDir)
+		defer utils.EmitCleanup(tmpDir, outfmt)
+
 		outputDir = tmpDir
 	}
-	// more create dirs
-	os.MkdirAll(outputDir, 0750)
 
+	os.MkdirAll(outputDir, 0755)
 	if rootDir != "" {
-		if err := filepath.Walk(rootDir, visit); err != nil {
+		if err := filepath.Walk(rootDir, visitWalk); err != nil {
 			errLog.Printf("[walk] %s", err)
 		}
 	} else {
-		// start scanner and wait for stdin
-		scanner := bufio.NewScanner(os.Stdin)
-		for scanner.Scan() {
-			text := strings.Replace(scanner.Text(), "\n", "", -1)
-			if strings.HasPrefix(text, "[") {
-				errLog.Printf("[stdin] %s", text)
-				continue
-			} else if strings.HasPrefix(text, "#-") {
-				// was signalled deletion of previous tmpdir, wait until finished
-				defer os.RemoveAll(strings.TrimPrefix(text, "#-"))
-			} else {
-				finfo, err := os.Stat(text)
-				if err != nil {
-					errLog.Printf("[stat] %s", text)
+		if infmt == "path" {
+			// start scanner and wait for stdin
+			scanner := bufio.NewScanner(os.Stdin)
+			for scanner.Scan() {
+				text := strings.Replace(scanner.Text(), "\n", "", -1)
+				if strings.HasPrefix(text, "[") {
+					errLog.Printf("[stdin] %s", text)
 					continue
+				} else if strings.HasPrefix(text, "#-") {
+					// was signalled deletion of previous tmpdir, wait until finished
+					defer os.RemoveAll(strings.TrimPrefix(text, "#-"))
+				} else {
+					img, err := utils.LoadImage(text)
+					if err != nil {
+						errLog.Printf("[load] %s", err)
+					}
+					visit(img)
 				}
-				visit(text, finfo, nil)
+				data := strings.Replace(scanner.Text(), "\n", "", -1)
+				if strings.HasPrefix(data, "[") {
+					errLog.Printf("[stdin] %s", data)
+					continue
+				} else {
+					img, err := utils.LoadImage(data)
+					if err != nil {
+						errLog.Printf("[load] %s", err)
+					}
+					visit(img)
+				}
 			}
+
+		} else {
+			//data := scanner.Bytes()
+			//img := utils.Image{}
+			//err := json.Unmarshal(data, &img)
+			//if err != nil {
+			//
+			//	errLog.Printf("[json] %s", err)
+			//	continue
+			//}
+
+			// clean up...
+			//t := utils.TempDir{}
+			//if err := json.Unmarshal(data, &t); err == nil{
+			//	defer fmt.Printf("Removing %s\n", t.Path)
+			//	defer os.RemoveAll(t.Path)
+			//}
+			//continue
+
+			utils.Handle(visit, os.RemoveAll, infmt)
 		}
 	}
 }

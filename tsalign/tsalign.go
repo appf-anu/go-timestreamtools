@@ -15,70 +15,57 @@ import (
 )
 
 var (
-	errLog             *log.Logger
-	interval           time.Duration
-	rootDir, outputDir string
-	del                bool
-	datetimeFunc       datetimeFunction
+	errLog                            *log.Logger
+	interval                          time.Duration
+	rootDir, outputDir, infmt, outfmt string
 )
 
-type datetimeFunction func(string) (time.Time, error)
+func alignedFilename(img utils.Image) (string, error) {
 
-func alignedFilename(thisFile string) (string, error) {
-	thisTime, err := datetimeFunc(thisFile)
-	if err != nil {
-		return "", err
-	}
+	aligned := img.Timestamp.Truncate(interval)
 
-	aligned := thisTime.Truncate(interval)
-
-	if err != nil {
-		return "", err
-	}
-
-	targetFilename := strings.Replace(thisFile, thisTime.Format(utils.TsForm), aligned.Format(utils.TsForm), 1)
+	targetFilename := strings.Replace(img.Path, img.Timestamp.Format(utils.TsForm), aligned.Format(utils.TsForm), 1)
 	// make sure that if its already formatted as a timestream that we reformat the timestream structure.
-	targetFilename = strings.Replace(targetFilename, thisTime.Format(utils.DefaultTsDirectoryStructure), aligned.Format(utils.DefaultTsDirectoryStructure), 1)
-	if del {
-		return targetFilename, nil
-	}
+	targetFilename = strings.Replace(targetFilename, img.Timestamp.Format(utils.DefaultTsDirectoryStructure), aligned.Format(utils.DefaultTsDirectoryStructure), 1)
 
 	return path.Join(outputDir, targetFilename), nil
 }
 
-func moveOrRename(source, dest string) error {
+func moveOrRename(img utils.Image, dest string) error {
 	// rename/copy+del if del is true otherwise moveFilebyCopy to not del.
 	var err error
-	if del {
-		err = os.Rename(source, dest)
-		if err != nil {
-			err = utils.MoveFilebyCopy(source, dest, del)
-		}
+
+	if len(img.Data) != 0 {
+		err = utils.WriteImageToFile(img, dest)
 	} else {
-		err = utils.MoveFilebyCopy(source, dest, del)
+		if err = utils.MoveFilebyCopy(img.Path, dest); err != nil {
+			errLog.Printf("[move] %s", err)
+			return nil
+		}
 	}
-	if err != nil {
-		errLog.Printf("[move] %s", err)
-		return nil
-	}
+
 	return err
 }
 
-func visit(filePath string, info os.FileInfo, _ error) error {
+func visitWalk(filePath string, info os.FileInfo, _ error) error {
 	// skip directories
 	if info.IsDir() {
 		return nil
 	}
-	if path.Ext(filePath) == ".json" {
-		return nil
+	img, err := utils.LoadImage(filePath)
+	img.OriginalPath = filePath
+	if err != nil {
+		errLog.Printf("[load] %s", err)
 	}
 
-	if strings.HasPrefix(filepath.Base(filePath), ".") {
-		return nil
-	}
+	return visit(img)
+}
 
+
+func visit(image utils.Image) error {
 	// parse the new filepath
-	newPath, err := alignedFilename(filePath)
+
+	newPath, err := alignedFilename(image)
 	if err != nil {
 		errLog.Printf("[parse] %s", err)
 		return nil
@@ -88,7 +75,7 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 
 	if _, err := os.Stat(newPath); err == nil {
 		// skip existing.
-		errLog.Printf("[skipped] %s", filePath)
+		errLog.Printf("[skipped] %s", image.Path)
 		return nil
 	}
 
@@ -99,52 +86,48 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 		return nil
 	}
 
-	absSrc, _ := filepath.Abs(filePath)
+	absSrc, _ := filepath.Abs(image.Path)
 	absDest, _ := filepath.Abs(newPath)
 	if absSrc == absDest {
 		errLog.Printf("[dupe] %s", absDest)
+		image.Path = absDest
+		utils.Emit(image, outfmt)
 		return nil
 	}
 
-	if err := moveOrRename(filePath, absDest); err != nil{
+	if err := moveOrRename(image, absDest); err != nil {
 		errLog.Printf("[move] %s", err)
 		return nil
 	}
 
-	jsFile := filePath + ".json"
-	if _, ferr := os.Stat(jsFile); ferr == nil {
-		if e := moveOrRename(jsFile, absDest+".json"); e != nil {
-			errLog.Println("[exif] couldn't move json exif file")
-		}
-	}
-	utils.EmitPath(newPath)
+	image.Path = absDest
+	utils.Emit(image, outfmt)
 	return err
 }
 
 var usage = func() {
-	fmt.Printf("usage of %s:\n", os.Args[0])
-	fmt.Println()
-	fmt.Println("\talign images in place:")
-	fmt.Printf("\t\t%s -source <source> -output <source>\n", os.Args[0])
-	fmt.Println("\t copy aligned to <destination>:")
-	fmt.Printf("\t\t%s -source <source> -output=<destination>\n", os.Args[0])
+	use := `
+usage of %s:
+flags:
+	-name: renames the prefix fo the target files
+	-output: set the <destination> directory (set to "tmp" to use and output a temporary dir)
+	-outfmt: output format (choices: json,msgpack,path default=path)
+	-infmt: input format (choices: json,msgpack,path default=path)
+	-source: set the <source> directory (optional, default=stdin)
+	-interval: set the interval to align to (optional, default=5m)
 
-	fmt.Println()
-	fmt.Println("flags:")
-	fmt.Println()
-	fmt.Println("\t-name: renames the prefix fo the target files")
-	fmt.Println("\t-exif: uses exif data to rename rather than file timestamp")
-	fmt.Printf("\t-output: set the <destination> directory (default=<cwd>)")
-	fmt.Println("\t-source: set the <source> directory (optional, default=stdin)")
-	fmt.Println("\t-interval: set the interval to align to (optional, default=5m)")
-	fmt.Println()
-	fmt.Println("will only align down, if an image is at 10:03 (5m interval) it will align to 10:00")
-	fmt.Println("chronologically earlier images will be kept")
-	fmt.Println("ie. at 5m interval, an image at 10:03 will overwrite an image at 10:02")
-	fmt.Println()
-	fmt.Println("reads filepaths from stdin")
-	fmt.Println("writes paths to resulting files to stdout")
-	fmt.Println("will ignore any line from stdin that isnt a filepath (and only a filepath)")
+examples:
+	align images in place:
+		%s -source <source> -output <source>
+	copy aligned to <destination>
+		%s -source <source> -output=<destination>
+
+will only align down, if an image is at 10:03 (5m interval) it will align to 10:00
+chronologically earlier images will be kept
+ie. at 5m interval, an image at 10:03 will overwrite an image at 10:02
+
+`
+	fmt.Printf(use, os.Args[0], os.Args[0], os.Args[0])
 }
 
 func init() {
@@ -155,16 +138,11 @@ func init() {
 	flag.DurationVar(&interval, "interval", time.Minute*5, "interval to align to.")
 	flag.StringVar(&rootDir, "source", "", "source directory")
 	flag.StringVar(&outputDir, "output", "", "output directory")
-	flag.BoolVar(&del, "del", false, "delete source images")
-	useExif := flag.Bool("exif", false, "use exif instead of timestamps in filenames")
+	flag.StringVar(&outfmt, "outfmt", "path", "output format")
+	flag.StringVar(&infmt, "infmt", "path", "input format")
+
 	// parse the leading argument with normal flag.Parse
 	flag.Parse()
-
-	if *useExif {
-		datetimeFunc = utils.GetTimeFromExif
-	} else {
-		datetimeFunc = utils.GetTimeFromFileTimestamp
-	}
 
 	if rootDir != "" {
 		if _, err := os.Stat(rootDir); err != nil {
@@ -177,41 +155,72 @@ func init() {
 }
 
 func main() {
-	if outputDir == "" {
+	if outputDir == "tmp" {
 		tmpDir, err := ioutil.TempDir("", "tsalign-")
 		if err != nil {
 			panic(err)
 		}
-		// pass delete dir onto next step once finished
-		defer utils.EmitPath("#-" + tmpDir)
+		defer utils.EmitCleanup(tmpDir, outfmt)
+
 		outputDir = tmpDir
 	}
-	// more create dirs
-	os.MkdirAll(outputDir, 0755)
 
+	os.MkdirAll(outputDir, 0755)
 	if rootDir != "" {
-		if err := filepath.Walk(rootDir, visit); err != nil {
+		if err := filepath.Walk(rootDir, visitWalk); err != nil {
 			errLog.Printf("[walk] %s", err)
 		}
 	} else {
-		// start scanner and wait for stdin
-		scanner := bufio.NewScanner(os.Stdin)
-		for scanner.Scan() {
-			text := strings.Replace(scanner.Text(), "\n", "", -1)
-			if strings.HasPrefix(text, "[") {
-				errLog.Printf("[stdin] %s", text)
-				continue
-			} else if strings.HasPrefix(text, "#-") {
-				// was signalled deletion of previous tmpdir, wait until finished
-				defer os.RemoveAll(strings.TrimPrefix(text, "#-"))
-			} else {
-				finfo, err := os.Stat(text)
-				if err != nil {
-					errLog.Printf("[stat] %s", text)
+		if infmt == "path" {
+			// start scanner and wait for stdin
+			scanner := bufio.NewScanner(os.Stdin)
+			for scanner.Scan() {
+				text := strings.Replace(scanner.Text(), "\n", "", -1)
+				if strings.HasPrefix(text, "[") {
+					errLog.Printf("[stdin] %s", text)
 					continue
+				} else if strings.HasPrefix(text, "#-") {
+					// was signalled deletion of previous tmpdir, wait until finished
+					defer os.RemoveAll(strings.TrimPrefix(text, "#-"))
+				} else {
+					img, err := utils.LoadImage(text)
+					if err != nil {
+						errLog.Printf("[load] %s", err)
+					}
+					visit(img)
 				}
-				visit(text, finfo, nil)
+				data := strings.Replace(scanner.Text(), "\n", "", -1)
+				if strings.HasPrefix(data, "[") {
+					errLog.Printf("[stdin] %s", data)
+					continue
+				} else {
+					img, err := utils.LoadImage(data)
+					if err != nil {
+						errLog.Printf("[load] %s", err)
+					}
+					visit(img)
+				}
 			}
+
+		} else {
+			//data := scanner.Bytes()
+			//img := utils.Image{}
+			//err := json.Unmarshal(data, &img)
+			//if err != nil {
+			//
+			//	errLog.Printf("[json] %s", err)
+			//	continue
+			//}
+
+			// clean up...
+			//t := utils.TempDir{}
+			//if err := json.Unmarshal(data, &t); err == nil{
+			//	defer fmt.Printf("Removing %s\n", t.Path)
+			//	defer os.RemoveAll(t.Path)
+			//}
+			//continue
+
+			utils.Handle(visit, os.RemoveAll, infmt)
 		}
 	}
 }

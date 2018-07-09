@@ -8,21 +8,17 @@ import (
 	"github.com/borevitzlab/go-timestreamtools/utils"
 	"log"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
 )
 
 var (
-	errLog           *log.Logger
-	rootDir          string
-	start, end       time.Time
-	datetimeFunc     datetimeFunction
-	startTod, endTod time.Time
+	errLog                 *log.Logger
+	rootDir, outfmt, infmt string
+	start, end             time.Time
+	startTod, endTod       time.Time
 )
-
-type datetimeFunction func(string) (time.Time, error)
 
 func inTimeSpan(check time.Time) bool {
 	// from: https://stackoverflow.com/questions/20924303/date-time-comparison-in-golang
@@ -35,29 +31,30 @@ func inTimeOfDay(t time.Time) bool {
 	return t.After(st) && t.Before(en) || t == en || t == st
 }
 
-func checkFilePath(thisFile string) (bool, error) {
-	thisTime, err := datetimeFunc(thisFile)
-	if err != nil {
-		return false, err
-	}
-	return inTimeSpan(thisTime) && inTimeOfDay(thisTime), nil
+func checkFilePath(img utils.Image) (bool, error) {
+	return inTimeSpan(img.Timestamp) && inTimeOfDay(img.Timestamp), nil
 }
 
-func visit(filePath string, info os.FileInfo, _ error) error {
+func visitWalk(filePath string, info os.FileInfo, _ error) error {
 	// skip directories
 	if info.IsDir() {
 		return nil
 	}
-	if path.Ext(filePath) == ".json" {
-		return nil
+
+	image, err := utils.LoadImage(filePath)
+	image.OriginalPath = filePath
+	if err != nil {
+		errLog.Printf("[load] %s", err)
 	}
 
-	if strings.HasPrefix(filepath.Base(filePath), ".") {
-		return nil
-	}
+	return visit(image)
+}
 
-	if ok, err := checkFilePath(filePath); ok {
-		utils.EmitPath(filePath)
+
+func visit(img utils.Image) error {
+
+	if ok, err := checkFilePath(img); ok {
+		utils.Emit(img, outfmt)
 	} else if err != nil {
 		errLog.Printf("[check] %s", err)
 	}
@@ -66,29 +63,28 @@ func visit(filePath string, info os.FileInfo, _ error) error {
 }
 
 var usage = func() {
-	fmt.Printf("usage of %s:\n", os.Args[0])
-	fmt.Println()
-	fmt.Println("\tfilter from 11 June 1996 until now with source:")
-	fmt.Printf("\t\t %s -source <source> -start 1996-06-11\n", os.Args[0])
-	fmt.Println("\tfilter from 11 June 1996 to 10 December 1996 from stdin:")
+	use := `
+usage of %s:
+flags:
+	-start: the start datetime (default=1970-01-01 00:00)
+	-end: the end datetime (default=now)
+	-starttod: the start time of day, default 00:00:00
+	-endtod: the end time of day, default 23:59:59
+	-source: set the <source> directory (optional, default=stdin)
+	-outfmt: output format (choices: json,msgpack,path default=path)
+	-infmt: input format (choices: json,msgpack,path default=path)
 
-	fmt.Printf("\t\t %s -start 1996-06-11 -end 1996-12-10\n", os.Args[0])
-	fmt.Println()
-	fmt.Println("flags:")
-	fmt.Println()
-	fmt.Println("\t-start: the start datetime (default=1970-01-01 00:00)")
-	fmt.Println("\t-end: the end datetime (default=now)")
-	fmt.Println("\t-starttod: the start time of day, default 00:00:00")
-	fmt.Println("\t-endtod: the end time of day, default 23:59:59")
-	fmt.Println("\t-exif: uses exif data to get time instead of the file timestamp")
-	fmt.Println("\t-source: set the <source> directory (optional, default=stdin)")
-	fmt.Println()
-	fmt.Println("dates are assumed to be DMY or YMD not MDY")
-	fmt.Println()
-	fmt.Println("reads filepaths from stdin")
-	fmt.Println("writes paths to selected files to stdout")
-	fmt.Println("will ignore any line from stdin that isnt a filepath (and only a filepath)")
-	fmt.Println("tsselect is NON DESTRUCTIVE, and doesnt copy/move files, it only filters")
+
+examples:
+	filter from 11 June 1996 until now with source:
+		%s -source <source> -start 1996-06-11
+	filter from 11 June 1996 to 10 December 1996 from stdin:
+		%s -start 1996-06-11 -end 1996-12-10
+
+dates are assumed to be DMY or YMD not MDY
+tsselect is NON DESTRUCTIVE, and doesnt copy/move files, it only filters
+`
+	fmt.Printf(use, os.Args[0])
 }
 
 func parseDateTime(tString string, t *time.Time, defaultValue time.Time) error {
@@ -147,19 +143,15 @@ func init() {
 	// set flags for flagset
 
 	flag.StringVar(&rootDir, "source", "", "source directory")
+	flag.StringVar(&outfmt, "outfmt", "path", "output format")
+	flag.StringVar(&infmt, "infmt", "path", "input format")
+
 	startString := flag.String("start", "", "start datetime")
 	endString := flag.String("end", "", "end datetime")
 	startTodString := flag.String("starttod", "", "start time of day")
 	endTodString := flag.String("endtod", "", "end time of day")
-	useExif := flag.Bool("exif", false, "use exif instead of timestamps in filenames")
 	// parse the leading argument with normal flag.Parse
 	flag.Parse()
-
-	if *useExif {
-		datetimeFunc = utils.GetTimeFromExif
-	} else {
-		datetimeFunc = utils.GetTimeFromFileTimestamp
-	}
 
 	defaultStart, _ := time.Parse(time.RFC3339, "1970-01-01T00:00:00Z")
 	defaultEnd, _ := time.Parse(utils.TsForm, time.Now().Format(utils.TsForm))
@@ -199,27 +191,60 @@ func init() {
 
 func main() {
 	if rootDir != "" {
-
-		if err := filepath.Walk(rootDir, visit); err != nil {
+		if err := filepath.Walk(rootDir, visitWalk); err != nil {
 			errLog.Printf("[walk] %s", err)
 		}
 	} else {
-		// start scanner and wait for stdin
-		scanner := bufio.NewScanner(os.Stdin)
-		for scanner.Scan() {
-
-			text := strings.Replace(scanner.Text(), "\n", "", -1)
-			if strings.HasPrefix(text, "[") {
-				errLog.Printf("[stdin] %s", text)
-				continue
-			} else {
-				finfo, err := os.Stat(text)
-				if err != nil {
-					errLog.Printf("[stat] %s", text)
+		if infmt == "path" {
+			// start scanner and wait for stdin
+			scanner := bufio.NewScanner(os.Stdin)
+			for scanner.Scan() {
+				text := strings.Replace(scanner.Text(), "\n", "", -1)
+				if strings.HasPrefix(text, "[") {
+					errLog.Printf("[stdin] %s", text)
 					continue
+				} else if strings.HasPrefix(text, "#-") {
+					// was signalled deletion of previous tmpdir, wait until finished
+					defer os.RemoveAll(strings.TrimPrefix(text, "#-"))
+				} else {
+					img, err := utils.LoadImage(text)
+					if err != nil {
+						errLog.Printf("[load] %s", err)
+					}
+					visit(img)
 				}
-				visit(text, finfo, nil)
+				data := strings.Replace(scanner.Text(), "\n", "", -1)
+				if strings.HasPrefix(data, "[") {
+					errLog.Printf("[stdin] %s", data)
+					continue
+				} else {
+					img, err := utils.LoadImage(data)
+					if err != nil {
+						errLog.Printf("[load] %s", err)
+					}
+					visit(img)
+				}
 			}
+
+		} else {
+			//data := scanner.Bytes()
+			//img := utils.Image{}
+			//err := json.Unmarshal(data, &img)
+			//if err != nil {
+			//
+			//	errLog.Printf("[json] %s", err)
+			//	continue
+			//}
+
+			// clean up...
+			//t := utils.TempDir{}
+			//if err := json.Unmarshal(data, &t); err == nil{
+			//	defer fmt.Printf("Removing %s\n", t.Path)
+			//	defer os.RemoveAll(t.Path)
+			//}
+			//continue
+
+			utils.Handle(visit, os.RemoveAll, infmt)
 		}
 	}
 }
