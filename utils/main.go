@@ -40,53 +40,77 @@ var (
 )
 
 const (
-	OS_READ        = 04
-	OS_WRITE       = 02
-	OS_EX          = 01
-	OS_USER_SHIFT  = 6
-	OS_GROUP_SHIFT = 3
-	OS_OTH_SHIFT   = 0
+	// Read bit
+	OsRead        = 04
+	// Write bit
+	OsWrite       = 02
+	// excute bit
+	OsEx          = 01
+	// user shift
+	OsUserShift  = 6
+	// group Shift
+	OsGroupShift = 3
+	// other shift
+	OsOtherShift   = 0
 
-	OS_USER_R   = OS_READ << OS_USER_SHIFT
-	OS_USER_W   = OS_WRITE << OS_USER_SHIFT
-	OS_USER_X   = OS_EX << OS_USER_SHIFT
-	OS_USER_RW  = OS_USER_R | OS_USER_W
-	OS_USER_RWX = OS_USER_RW | OS_USER_X
+	// user read
+	OsUserR   = OsRead << OsUserShift
+	// user write
+	OsUserW   = OsWrite << OsUserShift
+	// user execute
+	OsUserX   = OsEx << OsUserShift
+	// user read/write
+	OsUserRW  = OsUserR | OsUserW
+	// user read/write/execute
+	OsUserRWX = OsUserRW | OsUserX
 
-	OS_GROUP_R   = OS_READ << OS_GROUP_SHIFT
-	OS_GROUP_W   = OS_WRITE << OS_GROUP_SHIFT
-	OS_GROUP_X   = OS_EX << OS_GROUP_SHIFT
-	OS_GROUP_RW  = OS_GROUP_R | OS_GROUP_W
-	OS_GROUP_RWX = OS_GROUP_RW | OS_GROUP_X
+	// group read
+	OsGroupR   = OsRead << OsGroupShift
+	// group write
+	OsGroupW   = OsWrite << OsGroupShift
+	// group execute
+	OsGroupX   = OsEx << OsGroupShift
+	// group read/write
+	OsGroupRW  = OsGroupR | OsGroupW
+	// group read/write/execute
+	OsGroupRWX = OsGroupRW | OsGroupX
 
-	OS_OTH_R   = OS_READ << OS_OTH_SHIFT
-	OS_OTH_W   = OS_WRITE << OS_OTH_SHIFT
-	OS_OTH_X   = OS_EX << OS_OTH_SHIFT
-	OS_OTH_RW  = OS_OTH_R | OS_OTH_W
-	OS_OTH_RWX = OS_OTH_RW | OS_OTH_X
+	// other read
+	OsOthR   = OsRead << OsOtherShift
+	// other write
+	OsOthW   = OsWrite << OsOtherShift
+	// other execute
+	OsOthX   = OsEx << OsOtherShift
+	// other read/write
+	OsOthRW  = OsOthR | OsOthW
+	// other read/write/execute
+	OsOthRWX = OsOthRW | OsOthX
 
-	OS_ALL_R   = OS_USER_R | OS_GROUP_R | OS_OTH_R
-	OS_ALL_W   = OS_USER_W | OS_GROUP_W | OS_OTH_W
-	OS_ALL_X   = OS_USER_X | OS_GROUP_X | OS_OTH_X
-	OS_ALL_RW  = OS_ALL_R | OS_ALL_W
-	OS_ALL_RWX = OS_ALL_RW | OS_GROUP_X
+	// all read
+	OsAllR   = OsUserR | OsGroupR | OsOthR
+	// all write
+	OsAllW   = OsUserW | OsGroupW | OsOthW
+	// all execute
+	OsAllX   = OsUserX | OsGroupX | OsOthX
+	// all read/write
+	OsAllRW  = OsAllR | OsAllW
+	// all read/write/execute
+	OsAllRWX = OsAllRW | OsGroupX
 )
 
+// Image struct, definition of images and associated metadata
 type Image struct {
 	Path            string    `json:"path"`
 	OriginalPath    string    `json:"originalPath"`
 	Timestamp       time.Time `json:"timestamp"`
 	ExifTimestamp   time.Time `json:"exifTimestamp"`
-	ExifBytes       []byte    `json:"-"`
-	Data            []byte    `json:"-"`
+	ExifBytes       []byte    `json:"-" codec:"exifBytes"`
+	Data            []byte    `json:"-" codec:"data"`
 	CmdList         []string  `json:"cmdList"`
 	TempCleanupPath string    `json:"temp_cleanup_path,omitempty"`
 }
 
-type TempDir struct {
-	Path string
-}
-
+// Emit, outputs a serialised image to stdout using the defined output format
 func Emit(img Image, outfmt string) error {
 	switch  outfmt {
 	case "path":
@@ -111,6 +135,7 @@ func Emit(img Image, outfmt string) error {
 //	return jsonEncoder.Encode(img)
 //}
 
+// emit a directory cleanup message.
 func EmitCleanup(tmpDir, outfmt string) error{
 	// pass delete dir onto next step once finished
 	switch outfmt {
@@ -126,33 +151,13 @@ func EmitCleanup(tmpDir, outfmt string) error{
 	return err
 }
 
-type HandleImageFn func(img Image) error
-type HandleTempFn func(path string) error
+// function type for handing images
+type handleImageFn func(img Image) error
+// function type for handling cleanup
+type handleTempFn func(path string) error
 
-func HandleJSON(handleImageFn HandleImageFn, cleanupFn HandleTempFn) error {
-
-	for {
-		img := Image{}
-		err := jsonDecoder.Decode(&img)
-		if img.TempCleanupPath != "" {
-			defer cleanupFn(img.TempCleanupPath)
-			continue
-		}
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			errLog.Println(err)
-		}
-		err = handleImageFn(img)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func Handle(handleImageFn HandleImageFn, cleanupFn HandleTempFn, infmt string) error {
+// handle incoming images with
+func Handle(handleImageFn handleImageFn, cleanupFn handleTempFn, infmt string) error {
 
 	for {
 		img := Image{}
@@ -162,6 +167,8 @@ func Handle(handleImageFn HandleImageFn, cleanupFn HandleTempFn, infmt string) e
 			err = jsonDecoder.Decode(&img)
 		case "msgpack":
 			err = msgpackDecoder.Decode(&img)
+		default:
+			break
 		}
 
 		if img.TempCleanupPath != "" {
@@ -201,6 +208,7 @@ func getDtFromExif(exifData *exif.Exif) (datetime time.Time, err error) {
 	return
 }
 
+// LoadImage loads an image from a path, returns an image.
 func LoadImage(imgPath string) (img Image, err error) {
 	// is dot?
 	if strings.HasPrefix(filepath.Base(img.Path), ".") {
@@ -262,6 +270,7 @@ func LoadImage(imgPath string) (img Image, err error) {
 	return
 }
 
+// WriteImageToFile writes an images data to file
 func WriteImageToFile(img Image, destPath string) (err error) {
 	if len(img.Data) == 0 {
 		err = fmt.Errorf("[write] image has no data")
@@ -365,7 +374,7 @@ func MoveFilebyCopy(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	fileMode := os.FileMode(OS_USER_RW | OS_GROUP_RW)
+	fileMode := os.FileMode(OsUserRW | OsGroupRW)
 	d.Chmod(fileMode)
 
 	if _, err := io.Copy(d, s); err != nil {
