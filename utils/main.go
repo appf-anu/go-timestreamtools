@@ -110,7 +110,7 @@ type Image struct {
 	TempCleanupPath string    `json:"temp_cleanup_path,omitempty"`
 }
 
-// Emit, outputs a serialised image to stdout using the defined output format
+// Emit outputs a serialised image to stdout using the defined output format
 func Emit(img Image, outfmt string) error {
 	switch  outfmt {
 	case "path":
