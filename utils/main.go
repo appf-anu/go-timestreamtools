@@ -40,61 +40,61 @@ var (
 )
 
 const (
-	// Read bit
+	// OsRead Read bit
 	OsRead        = 04
-	// Write bit
+	// OsWrite bit
 	OsWrite       = 02
-	// excute bit
+	// OsEx execute bit
 	OsEx          = 01
-	// user shift
+	// OsUserShift user shift
 	OsUserShift  = 6
-	// group Shift
+	// OsGroupShift group Shift
 	OsGroupShift = 3
-	// other shift
+	// OsOtherShift other shift
 	OsOtherShift   = 0
 
-	// user read
+	// OsUserR user read
 	OsUserR   = OsRead << OsUserShift
-	// user write
+	// OsUserW user write
 	OsUserW   = OsWrite << OsUserShift
-	// user execute
+	// OsUserX user execute
 	OsUserX   = OsEx << OsUserShift
-	// user read/write
+	// OsUserRW user read/write
 	OsUserRW  = OsUserR | OsUserW
-	// user read/write/execute
+	// OsUserRWX user read/write/execute
 	OsUserRWX = OsUserRW | OsUserX
 
-	// group read
+	// OsGroupR group read
 	OsGroupR   = OsRead << OsGroupShift
-	// group write
+	// OsGroupW group write
 	OsGroupW   = OsWrite << OsGroupShift
-	// group execute
+	// OsGroupX group execute
 	OsGroupX   = OsEx << OsGroupShift
-	// group read/write
+	// OsGroupRW group read/write
 	OsGroupRW  = OsGroupR | OsGroupW
-	// group read/write/execute
+	// OsGroupRWX group read/write/execute
 	OsGroupRWX = OsGroupRW | OsGroupX
 
-	// other read
+	// OsOthR other read
 	OsOthR   = OsRead << OsOtherShift
-	// other write
+	// OsOthW other write
 	OsOthW   = OsWrite << OsOtherShift
-	// other execute
+	// OsOthX other execute
 	OsOthX   = OsEx << OsOtherShift
-	// other read/write
+	// OsOthRW other read/write
 	OsOthRW  = OsOthR | OsOthW
-	// other read/write/execute
+	// OsOthRWX other read/write/execute
 	OsOthRWX = OsOthRW | OsOthX
 
-	// all read
+	// OsAllR all read
 	OsAllR   = OsUserR | OsGroupR | OsOthR
-	// all write
+	// OsAllW all write
 	OsAllW   = OsUserW | OsGroupW | OsOthW
-	// all execute
+	// OsAllX all execute
 	OsAllX   = OsUserX | OsGroupX | OsOthX
-	// all read/write
+	// OsAllRW all read/write
 	OsAllRW  = OsAllR | OsAllW
-	// all read/write/execute
+	// OsAllRWX all read/write/execute
 	OsAllRWX = OsAllRW | OsGroupX
 )
 
@@ -135,7 +135,7 @@ func Emit(img Image, outfmt string) error {
 //	return jsonEncoder.Encode(img)
 //}
 
-// emit a directory cleanup message.
+// EmitCleanup emit a directory cleanup message.
 func EmitCleanup(tmpDir, outfmt string) error{
 	// pass delete dir onto next step once finished
 	switch outfmt {
@@ -151,12 +151,12 @@ func EmitCleanup(tmpDir, outfmt string) error{
 	return err
 }
 
-// function type for handing images
+// handleImageFn function type for handing images
 type handleImageFn func(img Image) error
-// function type for handling cleanup
+// handleTempFn function type for handling cleanup
 type handleTempFn func(path string) error
 
-// handle incoming images with
+// Handle incoming images with handle functions
 func Handle(handleImageFn handleImageFn, cleanupFn handleTempFn, infmt string) error {
 
 	for {
@@ -189,7 +189,7 @@ func Handle(handleImageFn handleImageFn, cleanupFn handleTempFn, infmt string) e
 	}
 	return nil
 }
-
+// getDtFromExif get a datetime from exif data
 func getDtFromExif(exifData *exif.Exif) (datetime time.Time, err error) {
 	// get the exif datetime
 	dt, err := exifData.Get(exif.DateTime)
@@ -293,6 +293,7 @@ func ParseExifDatetime(datetimeString string) (time.Time, error) {
 	return thisTime, nil
 }
 
+// exifFromJSON unmarshal struct for exif datetimes.
 type exifFromJSON struct {
 	DateTime          string
 	DateTimeOriginal  string
