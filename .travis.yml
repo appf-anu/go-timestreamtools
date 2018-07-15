@@ -19,6 +19,7 @@ before_script:
   - go get github.com/golang/lint/golint
   - go get github.com/stretchr/testify
   - go get honnef.co/go/tools/cmd/megacheck
+  - go get github.com/ugorji/go/codec
 
 script:
   - golint -set_exit_status ./utils
