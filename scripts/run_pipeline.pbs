@@ -1,0 +1,72 @@
+#!/bin/bash
+#PBS -P xe2
+#PBS -q normal
+#PBS -l ncpus=8
+#PBS -l walltime=08:00:00
+#PBS -l other=gdata1
+#PBS -l mem=2G
+#PBS -l jobfs=200G
+#PBS -m abe
+#PBS -e /g/data/xe2/phenomics/pipeline_logs/auto/error
+#PBS -o /g/data/xe2/phenomics/pipeline_logs/auto/out
+
+
+# this is an example pbs (bash script essentially) for running on raijin.
+# mainly just to demonstrate the use of these tools together as a pipeline
+
+# required SOURCE TRIAL
+
+# SOURCE="/g/data/xe2/phenomics/camupload/picam/$LOCATION"
+# TRIAL=
+# EXTRA=
+
+LOCATION=`basename $SOURCE`
+
+if [ -z "$NAME" ]
+then
+  if [ -z "$EXTRA" ]
+  then
+    NAME="$TRIAL-$LOCATION"
+  else
+    NAME="$TRIAL-$LOCATION-$EXTRA"
+  fi
+fi
+
+INTERVAL="${INTERVAL:-10m}"
+STARTTOD="${STARTTOD:-00:00}"
+ENDTOD="${ENDTOD:-23:59}"
+STARTTIME=$(date)
+RESOLUTION="${RESOLUTION:-1920x1280}"
+RESOLUTION_HIRES="${RESOLUTION_HIRES:-5184x3456}"
+START="${START:-$(date "+%Y-%m-%d")}"
+BINPATH=/g/data/xe2/phenomics/go-timestreamtools
+
+OUTPUT="/g/data/xe2/phenomics/structured_data/$TRIAL/data/timestreams/outputs/$NAME"
+mkdir -p "/g/data/xe2/phenomics/structured_data/${TRIAL}"
+find "/g/data/xe2/phenomics/structured_data/${TRIAL}" -type f -print0 | xargs -0 chmod 640
+find "/g/data/xe2/phenomics/structured_data/${TRIAL}" -type d -print0 | xargs -0 chmod 750
+
+set -xeo pipefail
+
+$BINPATH/./tsselect_linux-amd64 -source "$SOURCE" -start "$START" -starttod "$STARTTOD" -endtod "$ENDTOD" | \
+ grep -i ".tif\|.cr2" | \
+ $BINPATH/./tsalign_linux-amd64 -interval "${INTERVAL}" | \
+ $BINPATH/./tsrename_linux-amd64 -del -name "$NAME~fullres"| \
+ $BINPATH/./tsresize_linux-amd64 -res "$RESOLUTION_HIRES" | \
+ $BINPATH/./tsorganize_linux-amd64 -del -output "$OUTPUT/$NAME~fullres" | \
+ $BINPATH/./tsresize_linux-amd64 -res "$RESOLUTION" | \
+ $BINPATH/./tsrename_linux-amd64 -del -name "$NAME~1920"| \
+ $BINPATH/./tsorganize_linux-amd64 -del -output "$OUTPUT/$NAME~1920"
+
+nexttime=$(date -d "3 hour" "+%H00.00")
+nextstart=$(date -d "-1 hour" "+%Y-%m-%dT%H:00")
+
+echo "STARTED: ${STARTTIME}"
+echo "NEXT: ${nexttime}"
+echo "${NAME}"
+
+find $OUTPUT -type f -print0 | xargs -0 chmod 640
+find $OUTPUT -type d -print0 | xargs -0 chmod 750
+
+qsub -m a -N "${PBS_JOBNAME}" -v TRIAL="${TRIAL}",SOURCE="${SOURCE}",EXTRA="${EXTRA}",START="${nextstart}",STARTTOD="${STARTTOD}",ENDTOD="${ENDTOD}" \
+     -a "${nexttime}" $BINPATH/scripts/run_pipeline.pbs

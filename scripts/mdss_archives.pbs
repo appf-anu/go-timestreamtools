@@ -1,0 +1,32 @@
+#!/bin/bash
+#PBS -P xe2
+#PBS -q copyq
+#PBS -l ncpus=1
+#PBS -l walltime=01:00:00
+#PBS -l other=gdata1
+#PBS -l other=mdss
+#PBS -l mem=1G
+#PBS -l wd
+#PBS -W umask=017
+#PBS -m abe
+#PBS -e /g/data/xe2/phenomics/pipeline_logs/mdss_archive/error
+#PBS -o /g/data/xe2/phenomics/pipeline_logs/mdss_archive/out
+
+set -xeo pipefail
+
+FILES="${ARCHIVE_PATH}/*.tar.zst"
+
+# fix the permissions!
+mdss chmod -R ug+rw phenomics/camupload-archive
+
+for f in $FILES
+do
+    # avoid case where glob doesn't match (as then variable expands to the glob pattern string)
+    echo "$f"
+    [ -e "$f" ] || continue
+    mdss mkdir -p "phenomics/camupload-archive/${NAME}"
+    BASE=$(basename "$f")
+    mdss put "$f" "phenomics/camupload-archive/${NAME}/${BASE}"
+    mdss verify "phenomics/camupload-archive/${NAME}/${BASE}"
+    rm $f
+done

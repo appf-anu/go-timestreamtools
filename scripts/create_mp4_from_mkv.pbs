@@ -1,0 +1,39 @@
+#!/bin/bash
+#PBS -P xe2
+#PBS -q normal
+#PBS -l ncpus=8
+#PBS -l walltime=04:00:00
+#PBS -l other=gdata1
+#PBS -l mem=16G
+#PBS -l jobfs=10GB
+#PBS -m abe
+#PBS -e /g/data/xe2/phenomics/pipeline_logs/movies/error
+#PBS -o /g/data/xe2/phenomics/pipeline_logs/movies/out
+
+# this is an example pbs (bash script essentially) for running on raijin.
+# mainly just to demonstrate the use of these tools together as a pipeline
+
+# required SOURCE TRIAL
+
+# SOURCE="/g/data/xe2/phenomics/camupload/picam/$LOCATION"
+# TRIAL=
+# EXTRA=
+set -xeo pipefail
+BINPATH=/g/data/xe2/phenomics/go-timestreamtools
+
+FFMPEG_LOG_DIR="/g/data1a/xe2/phenomics/pipeline_logs/movies/ffmpeg"
+TMPDIR="${TMPDIR:-.}"
+THREADS=8
+FILENAME=`basename $SOURCE .mkv`
+DIR=`dirname $SOURCE`
+FRAMERATE=60
+OUTPUT="${DIR}/${NAME}"
+
+# encode as lossy 1080p h.264 mp4
+$BINPATH/ffmpeg -y -i "$SOURCE" -threads "${THREADS}" \
+  -c:v libx264 -pix_fmt yuv420p -profile:v baseline -level 3 \
+  -vf "scale=1920:1080" \
+  "${OUTPUT}-1080p.mp4" 2> "$FFMPEG_LOG_DIR/$$-mp4-1080p.log"
+
+chmod 640 "${SOURCE}"
+chmod 640 "${OUTPUT}-1080p.mp4"

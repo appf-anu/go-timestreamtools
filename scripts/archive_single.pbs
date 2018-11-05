@@ -1,0 +1,32 @@
+#!/bin/bash
+#PBS -P xe2
+#PBS -q normal
+#PBS -l walltime=5:00:00
+#PBS -l other=gdata1
+#PBS -l jobfs=10G
+#PBS -l mem=2G
+#PBS -l ncpus=4
+#PBS -m abe
+#PBS -e /g/data/xe2/phenomics/pipeline_logs/archive/error
+#PBS -o /g/data/xe2/phenomics/pipeline_logs/archive/out
+
+
+# another example pbs script, this exclusively archives old images
+
+# requires SOURCE
+
+set -xeo pipefail
+
+NAME=`basename "$SOURCE"`
+RESOLUTION=1920x1080
+
+BINPATH=/g/data/xe2/phenomics/go-timestreamtools
+
+OUTPUT="/g/data/xe2/phenomics/camupload/picam/$NAME-archive"
+nexttime=$(date -d "1 day" "+%H00")
+
+$BINPATH/./tsarchive_linux-amd64 -source "$SOURCE" -name "$NAME" -output "$OUTPUT"
+
+$BINPATH/./zstd --rm ${OUTPUT}/*.tar
+
+qsub -N "mdss_${NAME}" -v NAME="${NAME}",ARCHIVE_PATH="${OUTPUT}" $BINPATH/scripts/mdss_archives.pbs

@@ -1,0 +1,127 @@
+#!/bin/bash
+#PBS -P xe2
+#PBS -q normal
+#PBS -l ncpus=16
+#PBS -l walltime=02:00:00
+#PBS -l other=gdata1
+#PBS -l mem=16G
+#PBS -l jobfs=10GB
+#PBS -m abe
+#PBS -e /g/data/xe2/phenomics/pipeline_logs/movies/error
+#PBS -o /g/data/xe2/phenomics/pipeline_logs/movies/out
+
+# doc:
+# pbs for creating movies from timelapses on a schedule, should create vp9s as well.
+
+# required SOURCE TRIAL
+
+# SOURCE="/g/data/xe2/phenomics/camupload/picam/$LOCATION"
+# TRIAL=
+# EXTRA=
+set -xeo pipefail
+module load ffmpeg
+
+FFMPEG_LOG_DIR="/g/data1a/xe2/phenomics/pipeline_logs/movies/ffmpeg"
+TMPDIR="${TMPDIR:-.}"
+
+LOCATION=`basename $SOURCE`
+
+if [ -z "$NAME" ]
+then
+  if [ -z "$EXTRA" ]
+  then
+    NAME="$TRIAL-$LOCATION"
+  else
+    NAME="$TRIAL-$LOCATION-$EXTRA"
+  fi
+fi
+
+STARTTOD="${STARTTOD:-00:00}"
+ENDTOD="${ENDTOD:-23:59}"
+
+START="${START:-$(date "+%Y-%m-%d")}"
+BINPATH=/g/data/xe2/phenomics/go-timestreamtools
+END=${END:-$(date -d "1 day" "+%Y-%m-%d")}
+OUTPUT="/g/data/xe2/phenomics/structured_data/$TRIAL/data/timestreams/outputs/$NAME"
+mkdir -p "$(dirname "$OUTPUT")"
+
+nexttime=$(date -d "3 hour" "+%H00.00")
+nextstart=$(date "+%Y-%m-%dT%H:00")
+
+$BINPATH/tsselect_linux-amd64 -source "$SOURCE" -start "$START"  -starttod "$STARTTOD" -endtod "$ENDTOD" | \
+  grep ".jpg" > "$TMPDIR/$NAME-files.txt"
+
+# test the frames and ignore any that error, this test is because concat suxxxx
+while read f
+do
+    if ffprobe -loglevel warning $f
+    then
+        printf "file '%s'\n" $f >> "$TMPDIR/$NAME-files-ffmpeg.txt"
+    fi
+done < "$TMPDIR/$NAME-files.txt"
+
+# FFMPEG encodes
+# encode as lossless mkv
+$BINPATH/ffmpeg -y -f concat -r 60 -i "$TMPDIR/$NAME-files-ffmpeg.txt" \
+  -c:v libx264 -preset veryslow -crf 0 \
+  "${OUTPUT}_recent.mkv" 2> "$FFMPEG_LOG_DIR/$$-mkv.log"
+
+
+if [ -f "${OUTPUT}.mkv" ];
+then
+  echo "file $OUTPUT.mkv" > "$TMPDIR/videofiles.txt"
+  echo "file ${OUTPUT}_recent.mkv" >> "$TMPDIR/videofiles.txt"
+  $BINPATH/ffmpeg -y -f concat -safe 0 -i "$TMPDIR/videofiles.txt" \
+      -c:v libx264 -preset veryslow -crf 0 \
+      "${OUTPUT}_recent.mkv" 2> "$FFMPEG_LOG_DIR/$$-mkv.log"
+      rm "${OUTPUT}_recent.mkv"
+else
+  cp "${OUTPUT}_recent.mkv" "$OUTPUT.mkv"
+fi
+
+# # web capable compressed mp4
+$BINPATH/ffmpeg -y -r 30 -i "${OUTPUT}_recent.mkv" \
+  -c:v libx264 -pix_fmt yuv420p -profile:v baseline -level 3 \
+  "${OUTPUT}_recent.mp4" 2> "$FFMPEG_LOG_DIR/mp4.log"
+  # # web capable compressed mp4
+
+$BINPATH/ffmpeg -y -r 60 -i "${OUTPUT}_recent.mkv" \
+  -c:v libx264 -pix_fmt yuv420p -profile:v baseline -level 3 \
+  "${OUTPUT}_recent.mp4" 2> "$FFMPEG_LOG_DIR/mp4.log"
+
+# 1080p
+$BINPATH/ffmpeg -y -r 60 -i "$OUTPUT.mkv" \
+  -c:v libx264 -pix_fmt yuv420p -profile:v baseline -level 3 \
+  -vf "scale=1920:1080" \
+  "$OUTPUT-1080p.mp4" 2> "$FFMPEG_LOG_DIR/mp4.log"
+
+rm "${OUTPUT}_recent.mkv"
+
+
+if [ -f "${OUTPUT}.mp4" ];
+then
+  echo "file $OUTPUT.mp4" > "$TMPDIR/videofiles.txt"
+  echo "file ${OUTPUT}_recent.mp4" >> "$TMPDIR/videofiles.txt"
+  $BINPATH/ffmpeg -y -f concat -safe 0 -i "$TMPDIR/videofiles.txt" \
+      -c:v libx264 -preset veryslow -crf 0 \
+      "${OUTPUT}.mp4" 2> "$FFMPEG_LOG_DIR/$$-mkv.log"
+  rm "${OUTPUT}_recent.mp4"
+else
+  mv "${OUTPUT}_recent.mp4" "$OUTPUT.mp4"
+fi
+
+
+if [ -f "${OUTPUT}-1080p.mp4" ];
+then
+  echo "file ${OUTPUT}.mp4" > "$TMPDIR/videofiles.txt"
+  echo "file ${OUTPUT}_recent.mp4" >> "$TMPDIR/videofiles.txt"
+  $BINPATH/ffmpeg -y -f concat -safe 0 -i "$TMPDIR/videofiles.txt" \
+      -c:v libx264 -preset veryslow -crf 0 \
+      "${OUTPUT}.mp4" 2> "$FFMPEG_LOG_DIR/$$-mkv.log"
+  rm "${OUTPUT}_recent.mp4"
+else
+  mv "${OUTPUT}_recent.mp4" "$OUTPUT.mp4"
+fi
+
+qsub -v TRIAL="${TRIAL}",SOURCE="${SOURCE}",EXTRA="${EXTRA}",START="${nextstart}",STARTTOD="${STARTTOD}",ENDTOD="${ENDTOD}" \
+     -a "${nexttime}" $BINPATH/scripts/create_movie.pbs

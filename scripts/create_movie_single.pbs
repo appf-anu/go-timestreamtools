@@ -1,0 +1,83 @@
+#!/bin/bash
+#PBS -P xe2
+#PBS -q normal
+#PBS -l ncpus=16
+#PBS -l walltime=10:00:00
+#PBS -l other=gdata1
+#PBS -l mem=16G
+#PBS -l jobfs=1000GB
+#PBS -m abe
+#PBS -e /g/data/xe2/phenomics/pipeline_logs/movies/error
+#PBS -o /g/data/xe2/phenomics/pipeline_logs/movies/out
+
+# this is an example pbs (bash script essentially) for running on raijin.
+# mainly just to demonstrate the use of these tools together as a pipeline
+
+# required SOURCE TRIAL
+
+# SOURCE="/g/data/xe2/phenomics/camupload/picam/$LOCATION"
+# TRIAL=
+# EXTRA=
+set -xeo pipefail
+module load ffmpeg
+
+FFMPEG_LOG_DIR="/g/data1a/xe2/phenomics/pipeline_logs/movies/ffmpeg"
+TMPDIR="${TMPDIR:-.}"
+THREADS=8
+
+LOCATION=`basename $SOURCE`
+if [ -z "$NAME" ]
+then
+  if [ -z "$EXTRA" ]
+  then
+    NAME="$TRIAL-$LOCATION"
+  else
+    NAME="$TRIAL-$LOCATION-$EXTRA"
+  fi
+fi
+
+STARTTOD="${STARTTOD:-00:00}"
+ENDTOD="${ENDTOD:-23:59}"
+START="${START:-$(date -d "-30 years" "+%Y-%m-%d")}"
+FRAMERATE=60
+BINPATH=/g/data/xe2/phenomics/go-timestreamtools
+END=${END:-$(date -d "1 day" "+%Y-%m-%d")}
+OUTPUT="/g/data/xe2/phenomics/structured_data/$TRIAL/data/timestreams/outputs/$NAME"
+mkdir -p "$(dirname "$OUTPUT")"
+# output list of all images to file.
+$BINPATH/tsselect_linux-amd64 -source "$SOURCE" -start "$START" -end "$END" -starttod "$STARTTOD" -endtod "$ENDTOD" | \
+  $BINPATH/tsalign_linux-amd64 -interval 5m | \
+  grep -i ".tif\|.jpeg\|.jpg" > "$TMPDIR/${NAME}-files.txt"
+
+touch "$TMPDIR/${NAME}-files-ffmpeg.txt"
+# test the frames and ignore any that error, this test is because concat suxxxx
+while read f
+do
+    if ffprobe -loglevel warning $f
+    then
+        printf "file '%s'\n" $f >> "$TMPDIR/${NAME}-files-ffmpeg.txt"
+    fi
+done < "$TMPDIR/${NAME}-files.txt"
+
+# make sure they are sorted.
+# sort -u "$TMPDIR/${NAME}-files.txt" -o "$TMPDIR/${NAME}-files-ffmpeg.txt"
+
+# FFMPEG encodes
+# encode as lossless h.264 mkv
+$BINPATH/ffmpeg -y -f concat -safe 0 -r "${FRAMERATE}" -threads "${THREADS}" -i "$TMPDIR/${NAME}-files-ffmpeg.txt" \
+  -c:v libx264 -preset veryslow -crf 0 \
+  "${OUTPUT}.mkv" 2> "$FFMPEG_LOG_DIR/$$-mkv.log"
+
+# encode as lossy 1080p h.264 mp4
+$BINPATH/ffmpeg -y -i "$OUTPUT.mkv" -threads "${THREADS}" \
+  -c:v libx264 -pix_fmt yuv420p -profile:v baseline -level 3 \
+  -vf "scale=1920:-1" \
+  "${OUTPUT}-1080p.mp4" 2> "$FFMPEG_LOG_DIR/$$-mp4-1080p.log"
+
+# vp9 is buggy af atm
+# $BINPATH/ffmpeg -y -i "$OUTPUT.mkv" -threads "${THREADS}" \
+#     -c:v libvpx-vp9 -crf 17 -b:v 0 -tile-columns 6 -auto-alt-ref 1 -lag-in-frames 20 -deadline best \
+#     "$OUTPUT.webm" 2> "$FFMPEG_LOG_DIR/$$-webm.log"
+
+chmod 640 "${OUTPUT}.mkv"
+chmod 640 "${OUTPUT}-1080p.mp4"

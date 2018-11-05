@@ -1,0 +1,27 @@
+#!/bin/bash
+#PBS -P xe2
+#PBS -q normal
+#PBS -l ncpus=8
+#PBS -l walltime=12:00:00
+#PBS -l other=gdata1
+#PBS -l mem=2G
+#PBS -l jobfs=1G
+#PBS -m abe
+# another example pbs script, this exclusively resize and renames
+
+# requires SOURCE
+
+#NAME=`basename "$SOURCE"`
+
+PARENTDIR=`dirname "$SOURCE"`
+
+RESOLUTION=1920x1280
+BINPATH=/g/data1a/xe2/phenomics/go-timestreamtools
+
+#OUTPUT="/g/data/xe2/phenomics/structured_data/$TRIAL/data/timestreams/outputs"
+OUTPUT=${PARENTDIR}
+#echo "$OUTPUT/$OUTPUTNAME"
+
+$BINPATH/./tsresize_linux-amd64 -source "$SOURCE" -res "$RESOLUTION" | \
+ $BINPATH/./tsrename_linux-amd64 -del -name "$NAME"| \
+ $BINPATH/./tsorganize_linux-amd64 -del -output "$OUTPUT/$NAME"
